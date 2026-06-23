@@ -4,8 +4,8 @@ const api = axios.create({
   baseURL: "https://chatbotapp-production-d5b3.up.railway.app",
   timeout: 15000,
   
-  // 🚀 WAJIB DITAMBAHKAN AGAR SINKRON DENGAN LARAVEL
-  withCredentials: true, 
+  // Ubah menjadi false
+  withCredentials: false, 
   
   headers: {
     "Content-Type": "application/json",
