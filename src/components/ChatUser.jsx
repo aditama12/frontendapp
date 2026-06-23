@@ -150,7 +150,7 @@ useEffect(() => {
     setInputMessage("");
 
     try {
-      await api.get("/sanctum/csrf-cookie");
+      
 
       if (isCurrentChatEscalated) {
         const chatId = escalatedChatIds[sessionId];
