@@ -91,7 +91,8 @@ function ChatUser({ onLogout, user }) {
 
       if (!admin_replies || admin_replies.length === 0) return;
 
-      const messages = admin_replies.map(r => ({
+      const messages = admin_replies.map((r, index) => ({
+        id: new Date(r.created_at).getTime() + index, // Gunakan unix timestamp dari server sebagai ID
         role: "admin",
         text: r.message,
         time: new Date(r.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
@@ -259,8 +260,13 @@ function ChatUser({ onLogout, user }) {
   };
 
   // Gabungan pesan untuk ditampilkan (chats user/bot + balasan admin)
-  // Sort berdasarkan waktu agar chat saling berurutan (interleaved) atas bawah
+  // Sort berdasarkan ID (Unix Timestamp dalam milidetik) agar urutan PASTI akurat walau jam & menit sama
   const allMessages = [...chats, ...adminMessages].sort((a, b) => {
+    // Jika keduanya punya id (timestamp), gunakan id
+    if (a.id && b.id) {
+      return a.id - b.id;
+    }
+    // Fallback keamanan jika id tidak ada (seharusnya tidak terjadi)
     const timeA = (a.time || "").replace(".", ":");
     const timeB = (b.time || "").replace(".", ":");
     return timeA.localeCompare(timeB);
