@@ -2,11 +2,7 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: "https://chatbotapp-production-d5b3.up.railway.app",
-  timeout: 15000,
-  
-  // Ubah menjadi false
-  withCredentials: false, 
-  
+  timeout: 15000, 
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
