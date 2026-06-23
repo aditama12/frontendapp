@@ -16,13 +16,16 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const handleLoginSuccess = (userData) => {
+  // Cari baris ini dan sesuaikan
+  const handleLoginSuccess = (userData, token) => { 
     localStorage.setItem("user", JSON.stringify(userData));
+    localStorage.setItem("auth_token", token); // 👈 Simpan token
     setUser(userData);
   };
 
   const handleLogout = () => {
     localStorage.removeItem("user");
+    localStorage.removeItem("auth_token"); // 👈 Hapus token
     setUser(null);
   };
 

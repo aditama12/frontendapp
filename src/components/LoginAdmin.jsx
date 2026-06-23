@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logoSakti from "../assets/logoBlue.png";
-import api from "../services/api"; // 👈 Import konfigurasi axios kita
+import api from "../services/api";
 
 export default function LoginAdmin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Tambahan state untuk interaksi loading & error
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -17,25 +16,21 @@ export default function LoginAdmin() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setErrorMessage(""); // Bersihkan error sebelumnya
+    setErrorMessage("");
 
     try {
-      // 1. Ambil CSRF Cookie dari Laravel Sanctum
-      await api.get("/sanctum/csrf-cookie");
-
-      // 2. Kirim data login ke backend
       const response = await api.post("/api/mimin/login", {
         email: email,
         password: password,
         role: "admin",
       });
 
-      // 3. Jika berhasil, arahkan ke halaman Dashboard
-      if (response.status === 200 || response.status === 204) {
+      if (response.status === 200 || response.status === 201) {
+        // Simpan token yang didapat dari Laravel ke localStorage
+        localStorage.setItem("auth_token", response.data.token);
         navigate("/mimin/dashboard");
       }
     } catch (error) {
-      // Menangkap pesan error dari interceptor api.js kita
       setErrorMessage(error);
     } finally {
       setIsLoading(false);
@@ -43,23 +38,23 @@ export default function LoginAdmin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-700 via-blue-600 to-blue-800 flex items-center justify-center relative overflow-hidden px-4">
+    <div className="relative flex items-center justify-center min-h-screen px-4 overflow-hidden bg-gradient-to-br from-blue-700 via-blue-600 to-blue-800">
       {/* Ornamen Ombak Estetik Khas Mockup */}
-      <div className="absolute inset-y-0 right-0 w-1/3 bg-white/5 skew-x-12 transform origin-top-right pointer-events-none" />
-      <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-blue-500/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute inset-y-0 right-0 w-1/3 origin-top-right transform skew-x-12 pointer-events-none bg-white/5" />
+      <div className="absolute rounded-full pointer-events-none -bottom-20 -left-20 w-80 h-80 bg-blue-500/30 blur-3xl" />
 
       {/* Card Login Box */}
       <div className="max-w-md w-full bg-white bg-clip-padding border-[12px] border-white/30 backdrop-blur-xl rounded-[2.5rem] shadow-2xl p-8 space-y-8 relative z-10">
-        <div className="text-center space-y-3">
+        <div className="space-y-3 text-center">
           {/* Logo SAKTI Sidoarjo */}
-          <div className="mx-auto w-10 h-10 flex items-center justify-center transform hover:-translate-y-1 transition-transform duration-300">
+          <div className="flex items-center justify-center w-10 h-10 mx-auto transition-transform duration-300 transform hover:-translate-y-1">
             <img
               src={logoSakti}
               alt="Logo SAKTI"
-              className="w-full h-full object-contain"
+              className="object-contain w-full h-full"
             />
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 tracking-tight pt-2">
+          <h2 className="pt-2 text-2xl font-bold tracking-tight text-gray-800">
             Selamat Datang
           </h2>
           <p className="text-sm text-gray-400">
@@ -67,9 +62,9 @@ export default function LoginAdmin() {
           </p>
         </div>
 
-        {/* 👇 Tempat Menampilkan Pesan Error (Muncul kalau ada error saja) */}
+        {/* Tempat Menampilkan Pesan Error */}
         {errorMessage && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm font-medium text-center">
+          <div className="px-4 py-3 text-sm font-medium text-center text-red-600 border border-red-200 bg-red-50 rounded-xl">
             {errorMessage}
           </div>
         )}
@@ -77,11 +72,11 @@ export default function LoginAdmin() {
         <form onSubmit={handleLogin} className="space-y-5">
           {/* Email Input */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-500 tracking-wide block">
+            <label className="block text-xs font-semibold tracking-wide text-gray-500">
               Email
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-gray-400">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">
                 <svg
                   className="w-5 h-5"
                   fill="none"
@@ -103,18 +98,18 @@ export default function LoginAdmin() {
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-12 pr-4 py-3.5 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition-all text-gray-700 disabled:opacity-50"
                 placeholder="Masukkan email dinas"
                 required
-                disabled={isLoading} // 👈 Nonaktifkan saat proses loading
+                disabled={isLoading}
               />
             </div>
           </div>
 
           {/* Password Input */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-500 tracking-wide block">
+            <label className="block text-xs font-semibold tracking-wide text-gray-500">
               Password
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-gray-400">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">
                 <svg
                   className="w-5 h-5"
                   fill="none"
@@ -136,13 +131,13 @@ export default function LoginAdmin() {
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-12 pr-12 py-3.5 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition-all text-gray-700 disabled:opacity-50"
                 placeholder="Masukkan password"
                 required
-                disabled={isLoading} // 👈 Nonaktifkan saat proses loading
+                disabled={isLoading}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={isLoading}
-                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-gray-600 disabled:opacity-50"
               >
                 {showPassword ? (
                   <svg
@@ -189,11 +184,10 @@ export default function LoginAdmin() {
             disabled={isLoading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-4 text-sm shadow-xl shadow-blue-600/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0 mt-2 flex justify-center items-center gap-2 disabled:opacity-70 disabled:hover:translate-y-0"
           >
-            {/* 👇 Tampilkan spinner saat proses loading */}
             {isLoading ? (
               <>
                 <svg
-                  className="animate-spin -ml-1 mr-2 h-5 w-5 text-white"
+                  className="w-5 h-5 mr-2 -ml-1 text-white animate-spin"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -220,7 +214,7 @@ export default function LoginAdmin() {
           </button>
         </form>
 
-        <p className="text-center text-xs text-gray-400 font-medium">
+        <p className="text-xs font-medium text-center text-gray-400">
           2026 Dinas Kependudukan dan Pencatatan Sipil Sidoarjo
         </p>
       </div>

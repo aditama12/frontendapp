@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
 import logoSakti from "../assets/logoBlue.png";
@@ -22,18 +22,9 @@ function LoginUser({ onLoginSuccess }) {
     setLoading(true);
 
     try {
-      await api.get("/sanctum/csrf-cookie");
-
       let response;
 
       if (isRegister) {
-        console.log({
-          name,
-          email,
-          password,
-          passwordConfirmation,
-        });
-
         response = await api.post("/api/register", {
           name,
           email,
@@ -48,8 +39,9 @@ function LoginUser({ onLoginSuccess }) {
         });
       }
 
-      if (response.data?.user) {
-        onLoginSuccess(response.data.user);
+      // Pastikan backend mengirimkan user dan token
+      if (response.data?.user && response.data?.token) {
+        onLoginSuccess(response.data.user, response.data.token);
       }
     } catch (err) {
       console.error("Login/Register Error:", err);
@@ -80,7 +72,7 @@ function LoginUser({ onLoginSuccess }) {
         background: "linear-gradient(135deg, #002b80 0%, #001440 100%)", zIndex: 2
       }} />
 
-      <div className="absolute rounded-full pointer-events-none hidden md:block" style={{
+      <div className="absolute hidden rounded-full pointer-events-none md:block" style={{
         width: "23vw", height: "23vw", bottom: "10vh", left: "20vw",
         background: "linear-gradient(135deg, #0052cc 0%, #002266 100%)",
         boxShadow: "0 15px 35px rgba(0, 34, 102, 0.2)", zIndex: 3
@@ -92,7 +84,6 @@ function LoginUser({ onLoginSuccess }) {
       }} />
 
       {/* ================= MAIN CONTAINER LAYER ================= */}
-      {/* 👉 FIX: Margin kiri ditambah jadi lg:ml-[40vw] dan xl:ml-[45vw] biar geser mantap ke kanan */}
       <div className={`relative z-10 w-full px-4 sm:px-0 lg:ml-[35vw] xl:ml-[40vw] transition-all duration-300 ${
         isRegister ? "max-w-[380px]" : "max-w-[420px]"
       }`}>
@@ -110,25 +101,25 @@ function LoginUser({ onLoginSuccess }) {
           }}
         >
           {/* HEADER AREA */}
-          <div className="text-center space-y-1">
+          <div className="space-y-1 text-center">
             <div className={`mx-auto flex items-center justify-center transition-all ${
               isRegister ? "w-8 h-8" : "w-10 h-10"
             }`}>
-              <img src={logoSakti} alt="Logo SAKTI" className="w-full h-full object-contain" />
+              <img src={logoSakti} alt="Logo SAKTI" className="object-contain w-full h-full" />
             </div>
             <h2 className={`font-bold text-gray-800 tracking-tight transition-all ${
               isRegister ? "text-xl pt-0.5" : "text-2xl pt-1"
             }`}>
               {isRegister ? "Buat Akun Baru" : "Selamat Datang"}
             </h2>
-            <p className="text-xs text-gray-400 font-medium">
+            <p className="text-xs font-medium text-gray-400">
               {isRegister ? "Silahkan daftar untuk menikmati layanan Chatbot" : "Silahkan masuk ke layanan Chatbot"}
             </p>
           </div>
 
           {/* ERROR BOX */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-xl text-xs font-semibold text-center">
+            <div className="px-3 py-2 text-xs font-semibold text-center text-red-600 border border-red-200 bg-red-50 rounded-xl">
               {error}
             </div>
           )}
@@ -139,7 +130,7 @@ function LoginUser({ onLoginSuccess }) {
             {/* INPUT FIELD NAMA (Hanya saat Register) */}
             {isRegister && (
               <div className="space-y-1 text-left">
-                <label className="text-xs font-bold text-gray-600 tracking-wide block">
+                <label className="block text-xs font-bold tracking-wide text-gray-600">
                   Nama Lengkap
                 </label>
                 <div className="relative">
@@ -163,7 +154,7 @@ function LoginUser({ onLoginSuccess }) {
 
             {/* INPUT FIELD EMAIL */}
             <div className="space-y-1 text-left">
-              <label className="text-xs font-bold text-gray-600 tracking-wide block">
+              <label className="block text-xs font-bold tracking-wide text-gray-600">
                 Email Valid
               </label>
               <div className="relative">
@@ -188,7 +179,7 @@ function LoginUser({ onLoginSuccess }) {
 
             {/* INPUT FIELD PASSWORD */}
             <div className="space-y-1 text-left">
-              <label className="text-xs font-bold text-gray-600 tracking-wide block">
+              <label className="block text-xs font-bold tracking-wide text-gray-600">
                 Kata Sandi
               </label>
               <div className="relative">
@@ -230,7 +221,7 @@ function LoginUser({ onLoginSuccess }) {
             {/* INPUT FIELD KONFIRMASI PASSWORD (Hanya saat Register) */}
             {isRegister && (
               <div className="space-y-1 text-left">
-                <label className="text-xs font-bold text-gray-600 tracking-wide block">
+                <label className="block text-xs font-bold tracking-wide text-gray-600">
                   Konfirmasi Kata Sandi
                 </label>
                 <div className="relative">
@@ -287,7 +278,7 @@ function LoginUser({ onLoginSuccess }) {
             >
               {loading ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 mr-2 -ml-1 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
@@ -303,7 +294,7 @@ function LoginUser({ onLoginSuccess }) {
 
           {/* 🔗 NAVIGASI TEXT */}
           <div className={`text-center text-xs transition-all ${isRegister ? "pt-0.5" : "pt-2"}`}>
-            <span className="text-gray-500 font-semibold">
+            <span className="font-semibold text-gray-500">
               {isRegister ? "Sudah punya akun? " : "Belum punya akun? "}
             </span>
             <button
@@ -312,7 +303,7 @@ function LoginUser({ onLoginSuccess }) {
                 setIsRegister(!isRegister);
                 setError("");
               }}
-              className="text-blue-600 font-extrabold hover:underline transition bg-transparent border-none p-0 inline"
+              className="inline p-0 font-extrabold text-blue-600 transition bg-transparent border-none hover:underline"
             >
               {isRegister ? "Masuk di sini" : "Daftar di sini"}
             </button>
