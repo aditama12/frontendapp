@@ -147,7 +147,7 @@ function ChatUser({ onLogout, user }) {
 
   // ─── Session management ───────────────────────────────────────────────────
   const startNewSession = () => {
-    const newSession = { id: Date.now(), title: "Obrolan Baru", chats: [] };
+    const newSession = { id: Date.now(), title: "Obrolan Baru (v2)", chats: [] };
     setSessions(prev => [newSession, ...prev]);
     setActiveSessionId(newSession.id);
     setChats([]);
