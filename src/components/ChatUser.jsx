@@ -36,8 +36,6 @@ function ChatUser({ onLogout, user }) {
   // ─── Derived flags ────────────────────────────────────────────────────────
   const isCurrentChatEscalated = activeSessionId ? !!escalatedChatIds[activeSessionId] : false;
   const isCurrentChatResolved  = activeSessionId ? !!resolvedChats[activeSessionId]    : false;
-  // Gabungan pesan untuk ditampilkan (chats user/bot + balasan admin)
-  const allMessages = [...chats, ...adminMessages];
 
   // ─── Refs ─────────────────────────────────────────────────────────────────
   const chatBodyRef        = useRef(null);
