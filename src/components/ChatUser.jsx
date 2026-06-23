@@ -21,6 +21,11 @@ function ChatUser({ onLogout, user }) {
   const [activeSessionId, setActiveSessionId] = useState(() => getSavedData("activeSessionId", null));
   const [escalatedChatIds, setEscalatedChatIds] = useState(() => getSavedData("escalatedChatIds", {}));
   const [resolvedChats, setResolvedChats] = useState(() => getSavedData("resolvedChats", {}));
+
+  // Derived state: apakah sesi aktif saat ini sudah di-escalate ke admin?
+  const isCurrentChatEscalated = activeSessionId ? !!escalatedChatIds[activeSessionId] : false;
+  // Derived state: apakah sesi aktif saat ini sudah diselesaikan admin?
+  const isCurrentChatResolved = activeSessionId ? !!resolvedChats[activeSessionId] : false;
   
   const [chats, setChats] = useState(() => {
     const savedSessions = getSavedData("sessions", []);
@@ -96,6 +101,18 @@ useEffect(() => {
       if (timer) clearTimeout(timer);
     };
   }, [escalatedChatIds]);
+
+  // Persist state penting ke localStorage agar tidak hilang saat refresh
+  useEffect(() => {
+    if (!user?.id) return;
+    const save = (key, val) => {
+      try { localStorage.setItem(`${key}_${user.id}`, JSON.stringify(val)); } catch(e) {}
+    };
+    save('sessions', sessions);
+    save('activeSessionId', activeSessionId);
+    save('escalatedChatIds', escalatedChatIds);
+    save('resolvedChats', resolvedChats);
+  }, [sessions, activeSessionId, escalatedChatIds, resolvedChats, user?.id]);
 
   const startNewSession = () => {
     const newSession = { id: Date.now(), title: "Obrolan Baru", chats: [] };
@@ -267,7 +284,9 @@ useEffect(() => {
         );
       }
     }
-  }, [adminReplies, activeSessionId, escalatedChatIds, chats]);
+  // Sengaja tidak menyertakan 'chats' di dependency array untuk menghindari infinite loop
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminReplies, activeSessionId, escalatedChatIds]);
 
   const isEmptyState = !activeSessionId || chats.length === 0;
 
