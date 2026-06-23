@@ -1,6 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import logoSakti from "../assets/logoBlue.png";
 import api from "../services/api";
+import ReactMarkdown from 'react-markdown';
+
+function formatTime(dateString) {
+  const d = dateString ? new Date(dateString) : new Date();
+  const dateStr = d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+  const timeStr = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ":");
+  return `${dateStr}, ${timeStr}`;
+}
 
 function ChatUser({ onLogout, user }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
@@ -29,8 +37,6 @@ function ChatUser({ onLogout, user }) {
     return session ? session.chats : [];
   });
 
-  // State TERPISAH untuk balasan admin (di-fetch dari API, tidak di-mix ke chats)
-  // Ini jauh lebih simpel dan reliable dibanding append ke chats
   const [adminMessages, setAdminMessages] = useState([]);
 
   // ─── Derived flags ────────────────────────────────────────────────────────
@@ -42,7 +48,7 @@ function ChatUser({ onLogout, user }) {
   const inputRef           = useRef(null);
   const messagesEndRef     = useRef(null);
   const isUserScrollingRef = useRef(false);
-  const lastTimestampRef   = useRef(Date.now()); // Tracking timestamp tertinggi agar tidak kena clock drift HP vs Server
+  const lastTimestampRef   = useRef(Date.now()); 
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   const handleMobileSidebarClose = () => {
@@ -73,9 +79,6 @@ function ChatUser({ onLogout, user }) {
   }, [sessions, activeSessionId, escalatedChatIds, resolvedChats, user?.id]);
 
   // ─── Fetch balasan admin untuk sesi AKTIF ─────────────────────────────────
-  // Fungsi ini di-call oleh polling dan visibilitychange.
-  // Hasilnya langsung di-set ke adminMessages (replace, bukan append)
-  // sehingga tidak perlu tracking kompleks.
   const fetchAdminReplies = useCallback(async (sessionId, chatId) => {
     try {
       const res = await api.get(`/api/chatbot/escalated/${chatId}/status`);
@@ -94,23 +97,21 @@ function ChatUser({ onLogout, user }) {
 
       let maxAdminTime = 0;
       const messages = admin_replies.map((r, index) => {
-        const ts = new Date(r.created_at).getTime() + index; // Gunakan unix timestamp dari server sebagai ID
+        const ts = new Date(r.created_at).getTime() + index; 
         if (ts > maxAdminTime) maxAdminTime = ts;
         return {
           id: ts,
           role: "admin",
           text: r.message,
-          time: new Date(r.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+          time: formatTime(r.created_at),
           isAdminReply: true,
         };
       });
 
-      // Update jam tertinggi jika server lebih cepat dari HP
       if (maxAdminTime > lastTimestampRef.current) {
         lastTimestampRef.current = maxAdminTime;
       }
 
-      // REPLACE seluruh adminMessages — tidak ada tracking/counting, pasti benar
       setAdminMessages(messages);
       scrollToBottom();
     } catch (err) {
@@ -131,20 +132,18 @@ function ChatUser({ onLogout, user }) {
       if (!active) return;
       await fetchAdminReplies(activeSessionId, chatId);
       
-      // Lanjut polling HANYA jika belum resolved
       if (active && !resolvedChats[activeSessionId]) {
         timer = setTimeout(poll, 5000);
       }
     };
 
-    // Langsung fetch pertama kali (tetap fetch histori meskipun sudah resolved)
     poll();
 
     return () => { active = false; if (timer) clearTimeout(timer); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, escalatedChatIds, resolvedChats]);
 
-  // ─── Re-fetch saat tab kembali aktif (penting di mobile) ─────────────────
+  // ─── Re-fetch saat tab kembali aktif ─────────────────────────────────
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
@@ -172,7 +171,7 @@ function ChatUser({ onLogout, user }) {
   const selectSession = (session) => {
     setActiveSessionId(session.id);
     setChats(session.chats || []);
-    setAdminMessages([]); // Reset, polling akan fetch ulang untuk sesi baru
+    setAdminMessages([]);
     isUserScrollingRef.current = false;
     handleMobileSidebarClose();
   };
@@ -196,16 +195,13 @@ function ChatUser({ onLogout, user }) {
       setActiveSessionId(sessionId);
     }
 
-    const now     = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-    
-    // Pastikan ID pesan user (timestamp) selalu lebih besar dari pesan terakhir (mengatasi clock drift)
     let msgId = Date.now();
     if (msgId <= lastTimestampRef.current) {
-      msgId = lastTimestampRef.current + 1000; // Majukan 1 detik
+      msgId = lastTimestampRef.current + 1000;
     }
     lastTimestampRef.current = msgId;
 
-    const userMsg = { id: msgId, role: "user", text: inputMessage, time: now, status: "sending" };
+    const userMsg = { id: msgId, role: "user", text: inputMessage, time: formatTime(), status: "sending" };
 
     setChats(prev => {
       const updated = [...prev, userMsg];
@@ -232,8 +228,6 @@ function ChatUser({ onLogout, user }) {
         }
       } else {
         const response = await api.post("/api/chatbot/send", { message: msgToSend, user_id: user?.id });
-        const botTime  = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-        // Pastikan botMsg juga mengikuti aturan monotonic timestamp
         let botMsgId = Date.now() + 1;
         if (botMsgId <= lastTimestampRef.current) {
           botMsgId = lastTimestampRef.current + 1000;
@@ -244,7 +238,7 @@ function ChatUser({ onLogout, user }) {
           id: botMsgId,
           role: "bot",
           text: response.data.answer || response.data.message || "Maaf, tidak ada jawaban dari chatbot.",
-          time: botTime,
+          time: formatTime(),
         };
 
         if (response.data.needs_escalation && response.data.chat_id) {
@@ -258,7 +252,7 @@ function ChatUser({ onLogout, user }) {
             id: escMsgId,
             role: "system",
             text: "⚠️ Sistem: Pertanyaan Anda telah dialihkan ke Admin. Harap menunggu tanggapan.",
-            time: botTime,
+            time: formatTime(),
             isEscalated: true,
           };
           setEscalatedChatIds(prev => ({ ...prev, [sessionId]: response.data.chat_id }));
@@ -279,7 +273,7 @@ function ChatUser({ onLogout, user }) {
       const errMsg = {
         role: "bot",
         text: typeof err === "string" ? err : "Gagal terhubung ke server.",
-        time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+        time: formatTime(),
         isError: true,
       };
       setChats(prev => {
@@ -292,17 +286,9 @@ function ChatUser({ onLogout, user }) {
     }
   };
 
-  // Gabungan pesan untuk ditampilkan (chats user/bot + balasan admin)
-  // Sort berdasarkan ID (Unix Timestamp dalam milidetik) agar urutan PASTI akurat walau jam & menit sama
   const allMessages = [...chats, ...adminMessages].sort((a, b) => {
-    // Jika keduanya punya id (timestamp), gunakan id
-    if (a.id && b.id) {
-      return a.id - b.id;
-    }
-    // Fallback keamanan jika id tidak ada (seharusnya tidak terjadi)
-    const timeA = (a.time || "").replace(".", ":");
-    const timeB = (b.time || "").replace(".", ":");
-    return timeA.localeCompare(timeB);
+    if (a.id && b.id) return a.id - b.id;
+    return a.time.localeCompare(b.time);
   });
 
   const isEmptyState = !activeSessionId || chats.length === 0;
@@ -410,8 +396,6 @@ function ChatUser({ onLogout, user }) {
       </aside>
 
       <main className="relative flex flex-col flex-1 w-full h-full overflow-hidden bg-white">
-        
-        {/* MOBILE HEADER */}
         <div className="z-30 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 shadow-sm md:hidden">
           <button
             onClick={() => setIsSidebarOpen(true)}
@@ -438,14 +422,6 @@ function ChatUser({ onLogout, user }) {
               </p>
             </div>
             <div className="relative w-full max-w-xl">
-              <div
-                className="absolute hidden rounded-full pointer-events-none md:block"
-                style={{
-                  inset: "-20px",
-                  background: "radial-gradient(ellipse at center, rgba(0,76,219,0.15) 0%, transparent 70%)",
-                  filter: "blur(16px)",
-                }}
-              />
               <form
                 onSubmit={handleSendMessage}
                 className="relative bg-white border border-gray-200 rounded-3xl md:rounded-full px-4 md:px-5 py-2 md:py-3 flex items-center gap-3 shadow-sm md:shadow-[0_4px_30px_rgba(0,76,219,0.15)]"

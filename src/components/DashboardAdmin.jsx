@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
+function formatTime(dateString) {
+  const d = dateString ? new Date(dateString) : new Date();
+  const dateStr = d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+  const timeStr = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ":");
+  return `${dateStr}, ${timeStr}`;
+}
+
 export default function DashboardAdmin() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -144,7 +151,7 @@ export default function DashboardAdmin() {
                     <td className="px-6 py-4 font-semibold text-gray-800">{chat.user}</td>
                     <td className="max-w-xs px-6 py-4 truncate">{chat.message}</td>
                     <td className="px-6 py-4 text-gray-400">
-                      {new Date(chat.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                      {formatTime(chat.time)}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
@@ -274,7 +281,7 @@ export default function DashboardAdmin() {
                                 {msg.message}
                               </div>
                               <p className={`text-[10px] text-gray-400 mt-1 ${msg.type === 'admin' ? 'text-right' : 'text-left'}`}>
-                                {msg.type === 'admin' ? `Admin: ${msg.admin_name}` : 'User'} • {new Date(msg.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                {msg.type === 'admin' ? `Admin: ${msg.admin_name}` : 'User'} • {formatTime(msg.created_at)}
                               </p>
                             </div>
                           </div>

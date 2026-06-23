@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../services/api";
 
+function formatTime(dateString) {
+  const d = dateString ? new Date(dateString) : new Date();
+  const dateStr = d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+  const timeStr = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ":");
+  return `${dateStr}, ${timeStr}`;
+}
+
 export default function ChatAdmin() {
   const [activeChat, setActiveChat] = useState(null);
   const [chatList, setChatList] = useState([]);
@@ -205,7 +212,7 @@ export default function ChatAdmin() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between">
                       <h4 className="text-sm font-bold text-gray-800 truncate">{chat.user_name}</h4>
-                      <span className="text-xs text-gray-400">{new Date(chat.escalated_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span className="text-xs text-gray-400">{formatTime(chat.escalated_at)}</span>
                     </div>
                     <p className="text-xs text-gray-500 truncate mt-0.5">{chat.message}</p>
                   </div>
@@ -319,7 +326,7 @@ export default function ChatAdmin() {
                                 {msg.message}
                               </div>
                               <p className={`text-[10px] text-gray-400 mt-1 font-medium ${msg.type === 'admin' ? 'text-right' : 'text-left'}`}>
-                                {msg.type === 'admin' ? msg.admin_name : 'User'} • {new Date(msg.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                {msg.type === 'admin' ? msg.admin_name : 'User'} • {formatTime(msg.created_at)}
                               </p>
                             </div>
                           </div>

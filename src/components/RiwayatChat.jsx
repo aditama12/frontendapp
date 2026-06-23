@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import api from "../services/api";
 
+function formatTime(dateString) {
+  const d = dateString ? new Date(dateString) : new Date();
+  const dateStr = d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+  const timeStr = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ":");
+  return `${dateStr}, ${timeStr}`;
+}
+
 export default function RiwayatChat() {
   const [historyList, setHistoryList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -123,7 +130,6 @@ export default function RiwayatChat() {
             <thead>
               <tr className="bg-gray-50 text-gray-700 text-xs font-bold uppercase tracking-wider border-b border-gray-100">
                 <th className="px-6 py-4">User</th>
-                <th className="px-6 py-4">Ditangani Oleh</th>
                 <th className="px-6 py-4">Selesai Pada</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-center">Aksi</th>
@@ -144,13 +150,11 @@ export default function RiwayatChat() {
                 </tr>
               ) : (
                 currentItems.map((chat) => {
-                  const ditanganiOleh = chat.status === 'resolved' || chat.status === 'pending' ? 'Admin' : 'AI';
-                  const tanggal = new Date(chat.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+                  const tanggal = formatTime(chat.created_at);
                   
                   return (
                     <tr key={chat.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4 text-gray-800">{chat.user_name}</td>
-                      <td className="px-6 py-4 text-gray-600">Ditangani Oleh {ditanganiOleh}</td>
                       <td className="px-6 py-4 text-gray-600">{tanggal}</td>
                       
                       {/* 👉 INI BAGIAN STATUS YANG DIBENERIN WKWK */}
@@ -302,7 +306,7 @@ export default function RiwayatChat() {
                                 {msg.message}
                               </div>
                               <p className={`text-[10px] text-gray-400 mt-1 ${msg.type === 'admin' ? 'text-right' : 'text-left'}`}>
-                                {msg.type === 'admin' ? `Admin: ${msg.admin_name}` : 'User'} • {new Date(msg.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                {msg.type === 'admin' ? `Admin: ${msg.admin_name}` : 'User'} • {formatTime(msg.created_at)}
                               </p>
                             </div>
                           </div>
