@@ -6,7 +6,9 @@ function ChatUser({ onLogout, user }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [adminReplies, setAdminReplies] = useState({}); 
+  // Ref untuk menyimpan jumlah admin reply yang sudah ditampilkan per chatId
+  // Memakai ref (bukan state) agar tidak menyebabkan re-render berlebihan
+  const shownAdminRepliesRef = useRef({});
 
   const getSavedData = (key, defaultValue) => {
     try {
@@ -56,50 +58,76 @@ function ChatUser({ onLogout, user }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-useEffect(() => {
+  // ============================================================
+  // POLLING: Cek balasan admin setiap 4 detik untuk semua sesi
+  // yang sudah di-escalate. Langsung update chats & sessions
+  // tanpa state perantara untuk menghindari stale closure.
+  // ============================================================
+  useEffect(() => {
     if (Object.keys(escalatedChatIds).length === 0) return;
-    
+
     let isMounted = true;
     let timer = null;
 
     const checkAdminReplies = async () => {
       if (!isMounted) return;
-      
+
       for (const [sessionId, chatId] of Object.entries(escalatedChatIds)) {
         try {
-          // 👇 SUDAH DIGANTI: Menggunakan jalur publik, bukan rute mimin
           const response = await api.get(`/api/chatbot/escalated/${chatId}/status`);
-          if (response.data.success) {
-            const { admin_replies, chat } = response.data.data;
-            
-            if (chat && chat.status === 'resolved') {
-              setResolvedChats(prev => ({ ...prev, [sessionId]: true }));
-            }
+          if (!isMounted || !response.data.success) continue;
 
-            if (admin_replies && admin_replies.length > 0) {
-              setAdminReplies(prev => ({
-                ...prev,
-                [chatId]: admin_replies
-              }));
-            }
+          const { admin_replies, chat } = response.data.data;
+
+          // Tandai chat sebagai resolved jika sudah selesai
+          if (chat && chat.status === 'resolved') {
+            setResolvedChats(prev => ({ ...prev, [sessionId]: true }));
+          }
+
+          // Hitung berapa reply yang belum ditampilkan
+          const alreadyShown = shownAdminRepliesRef.current[chatId] || 0;
+          if (admin_replies && admin_replies.length > alreadyShown) {
+            const newReplies = admin_replies.slice(alreadyShown);
+            shownAdminRepliesRef.current[chatId] = admin_replies.length;
+
+            const newMessages = newReplies.map(reply => ({
+              role: 'admin',
+              text: reply.message,
+              time: new Date(reply.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+              isAdminReply: true,
+            }));
+
+            // Update chats (tampilan aktif)
+            setChats(prev => [...prev, ...newMessages]);
+
+            // Update sessions (riwayat sidebar) — pakai functional updater agar selalu fresh
+            setSessions(prev =>
+              prev.map(s =>
+                String(s.id) === String(sessionId)
+                  ? { ...s, chats: [...s.chats, ...newMessages] }
+                  : s
+              )
+            );
           }
         } catch (err) {
-          // Silent error
+          // Silent — jangan crash polling karena 1 request gagal
         }
       }
 
-      // 👇 SUDAH DIGANTI: Pakai setTimeout 4 detik biar gak nyekik server
       if (isMounted) {
         timer = setTimeout(checkAdminReplies, 4000);
       }
     };
-    
-    checkAdminReplies(); // Jalankan pertama kali
-    
+
+    checkAdminReplies();
+
     return () => {
       isMounted = false;
       if (timer) clearTimeout(timer);
     };
+  // escalatedChatIds sebagai satu-satunya trigger: polling dimulai ulang
+  // hanya saat ada sesi baru yang di-escalate
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [escalatedChatIds]);
 
   // Persist state penting ke localStorage agar tidak hilang saat refresh
@@ -236,57 +264,6 @@ useEffect(() => {
     }
   };
 
-  useEffect(() => {
-    if (activeSessionId && escalatedChatIds[activeSessionId]) {
-      const chatId = escalatedChatIds[activeSessionId];
-      if (adminReplies[chatId] && Array.isArray(adminReplies[chatId])) {
-        const adminReplyList = adminReplies[chatId];
-        
-        setChats(prev => {
-          const existingAdminReplies = prev.filter(c => c.isAdminReply);
-          if (existingAdminReplies.length < adminReplyList.length) {
-            const newAdminReplies = adminReplyList.slice(existingAdminReplies.length);
-            const newChats = [...prev];
-            
-            newAdminReplies.forEach(reply => {
-              newChats.push({
-                role: "admin",
-                text: reply.message,
-                time: new Date(reply.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-                isAdminReply: true
-              });
-            });
-            
-            return newChats;
-          }
-          return prev;
-        });
-        
-        setSessions((prev) =>
-          prev.map((s) =>
-             s.id === activeSessionId
-               ? {
-                   ...s,
-                   chats: chats.some(c => c.isAdminReply)
-                     ? chats
-                     : [
-                        ...chats,
-                        ...adminReplyList.map(reply => ({
-                          role: "admin",
-                          text: reply.message,
-                          time: new Date(reply.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-                          isAdminReply: true
-                        }))
-                      ]
-                }
-              : s
-          )
-        );
-      }
-    }
-  // Sengaja tidak menyertakan 'chats' di dependency array untuk menghindari infinite loop
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminReplies, activeSessionId, escalatedChatIds]);
 
   const isEmptyState = !activeSessionId || chats.length === 0;
 
