@@ -9,6 +9,8 @@ function ChatUser({ onLogout, user }) {
   // Ref untuk menyimpan jumlah admin reply yang sudah ditampilkan per chatId
   // Memakai ref (bukan state) agar tidak menyebabkan re-render berlebihan
   const shownAdminRepliesRef = useRef({});
+  // Ref untuk akses activeSessionId terbaru di dalam polling (hindari stale closure)
+  const activeSessionIdRef = useRef(null);
 
   const getSavedData = (key, defaultValue) => {
     try {
@@ -58,6 +60,11 @@ function ChatUser({ onLogout, user }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Selalu jaga activeSessionIdRef sinkron dengan state activeSessionId
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
+
   // ============================================================
   // POLLING: Cek balasan admin setiap 4 detik untuk semua sesi
   // yang sudah di-escalate. Langsung update chats & sessions
@@ -97,10 +104,14 @@ function ChatUser({ onLogout, user }) {
               isAdminReply: true,
             }));
 
-            // Update chats (tampilan aktif)
-            setChats(prev => [...prev, ...newMessages]);
+            // Update chats (tampilan aktif) HANYA jika session ini yang sedang dibuka user
+            if (String(sessionId) === String(activeSessionIdRef.current)) {
+              setChats(prev => [...prev, ...newMessages]);
+              // Scroll ke bawah agar pesan admin langsung terlihat
+              setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+            }
 
-            // Update sessions (riwayat sidebar) — pakai functional updater agar selalu fresh
+            // Update sessions (riwayat sidebar) — selalu update semua session
             setSessions(prev =>
               prev.map(s =>
                 String(s.id) === String(sessionId)
