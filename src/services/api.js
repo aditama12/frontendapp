@@ -1,10 +1,8 @@
 import axios from "axios";
 
-// 🚀 TAMBAHKAN FALLBACK RAILWAY DISINI
-const API_URL = import.meta.env.VITE_API_URL || "https://chatbotapp-production-d5b3.up.railway.app";
-
 const api = axios.create({
-  baseURL: API_URL,
+  // 🚀 HARCODE URL RAILWAY DI SINI (Hapus import.meta.env)
+  baseURL: "https://chatbotapp-production-d5b3.up.railway.app",
   timeout: 15000,
   headers: {
     "Content-Type": "application/json",
@@ -12,6 +10,7 @@ const api = axios.create({
   },
 });
 
+// Otomatis selipkan token kalau ada
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("auth_token");
   if (token) {
