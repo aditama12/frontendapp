@@ -36,17 +36,18 @@ export default function ChatAdmin() {
     }
   }, [chatDetail, activeChat]);
 
-  // Polling effect: Menggunakan Rekursif setTimeout agar request tidak menumpuk (Anti Network Error)
+  // Polling effect: Menggunakan Rekursif setTimeout dengan deteksi Tarikan Pertama (Auto-open)
   useEffect(() => {
     let isMounted = true;
     let timer = null;
 
-    const pollData = async () => {
+    const pollData = async (isFirstTime = false) => {
       if (!isMounted) return;
 
       // Pause narik data dari server JIKA admin lagi asik ngetik, biar ketikannya gak putus
       if (!replyTextRef.current.trim()) {
-        await loadEscalatedChats(true);
+        // Jika ini tarikan pertama, silent = false (agar chat auto-select). Jika bukan, silent = true.
+        await loadEscalatedChats(!isFirstTime); 
         
         // Refresh isi chat yang lagi dibuka
         if (activeChatRef.current?.id) {
@@ -56,12 +57,12 @@ export default function ChatAdmin() {
 
       // Jadwalkan request berikutnya HANYA SETELAH request saat ini selesai
       if (isMounted) {
-        timer = setTimeout(pollData, 3000);
+        timer = setTimeout(() => pollData(false), 3000);
       }
     };
 
-    // Jalankan pertama kali saat halaman dibuka
-    pollData();
+    // Jalankan pertama kali saat halaman dibuka dengan flag isFirstTime = true
+    pollData(true);
 
     return () => {
       isMounted = false;
@@ -160,7 +161,7 @@ export default function ChatAdmin() {
   return (
     <div className="-m-8 h-[calc(100vh-5rem)] flex overflow-hidden bg-white">
       {/* LEFT COLUMN: CHAT LIST */}
-      <div className="w-80 border-r border-gray-200 flex flex-col bg-gray-50/40">
+      <div className="flex flex-col border-r border-gray-200 w-80 bg-gray-50/40">
         <div className="p-6 space-y-4">
           <h2 className="text-xl font-bold text-gray-800">Daftar Chat</h2>
           <div className="relative">
@@ -171,7 +172,7 @@ export default function ChatAdmin() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-blue-500"
             />
-            <span className="absolute inset-y-0 left-3 flex items-center text-gray-400">
+            <span className="absolute inset-y-0 flex items-center text-gray-400 left-3">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             </span>
           </div>
@@ -180,7 +181,7 @@ export default function ChatAdmin() {
         {/* LIST HOLDER */}
         <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
           {filteredChatList.length === 0 ? (
-            <div className="p-4 text-center text-gray-400 text-sm">
+            <div className="p-4 text-sm text-center text-gray-400">
               Tidak ada chat yang menunggu
             </div>
           ) : (
@@ -198,11 +199,11 @@ export default function ChatAdmin() {
                     activeChat?.id === chat.id ? "bg-blue-50/60" : "hover:bg-gray-50"
                   }`}
                 >
-                  <div className="w-11 h-11 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex-shrink-0 flex items-center justify-center text-white font-semibold text-sm">
+                  <div className="flex items-center justify-center flex-shrink-0 text-sm font-semibold text-white rounded-full w-11 h-11 bg-gradient-to-br from-blue-400 to-blue-600">
                     {chat.user_name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-baseline">
+                    <div className="flex items-baseline justify-between">
                       <h4 className="text-sm font-semibold text-gray-800 truncate">{chat.user_name}</h4>
                       <span className="text-xs text-gray-400">{new Date(chat.escalated_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
@@ -220,13 +221,13 @@ export default function ChatAdmin() {
       </div>
 
       {/* RIGHT COLUMN: CHAT INTERACTION SPACE */}
-      <div className="flex-1 flex flex-col bg-gray-50">
+      <div className="flex flex-col flex-1 bg-gray-50">
         {activeChat ? (
           <>
             {/* HEADER AREA */}
-            <div className="h-16 border-b border-gray-200 bg-white px-6 flex items-center justify-between">
+            <div className="flex items-center justify-between h-16 px-6 bg-white border-b border-gray-200">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
+                <div className="flex items-center justify-center w-10 h-10 font-semibold text-white rounded-full bg-gradient-to-br from-blue-400 to-blue-600">
                   {activeChat.user_name.charAt(0).toUpperCase()}
                 </div>
                 <div>
@@ -239,7 +240,7 @@ export default function ChatAdmin() {
                   <button
                     onClick={handleResolveChat}
                     disabled={loading}
-                    className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-xl px-5 py-2 font-semibold text-sm transition-colors"
+                    className="px-5 py-2 text-sm font-semibold text-white transition-colors bg-green-600 hover:bg-green-700 disabled:bg-gray-300 rounded-xl"
                   >
                     Selesaikan Chat
                   </button>
@@ -253,7 +254,7 @@ export default function ChatAdmin() {
             </div>
 
             {/* CHAT CONTENT BOX */}
-            <div className="flex-1 p-6 overflow-y-auto space-y-6">
+            <div className="flex-1 p-6 space-y-6 overflow-y-auto">
               {loading && !chatDetail ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-gray-400">Memuat chat...</div>
@@ -262,9 +263,9 @@ export default function ChatAdmin() {
                 <>
                   {/* User Original Message */}
                   <div>
-                    <div className="text-xs text-gray-400 font-semibold mb-2">Pertanyaan User</div>
+                    <div className="mb-2 text-xs font-semibold text-gray-400">Pertanyaan User</div>
                     <div className="flex justify-start">
-                      <div className="bg-gray-100 text-gray-800 max-w-xl p-4 rounded-2xl rounded-tl-none text-sm leading-relaxed">
+                      <div className="max-w-xl p-4 text-sm leading-relaxed text-gray-800 bg-gray-100 rounded-tl-none rounded-2xl">
                         {chatDetail.chat.message}
                       </div>
                     </div>
@@ -272,9 +273,9 @@ export default function ChatAdmin() {
 
                   {/* Bot Reply */}
                   <div>
-                    <div className="text-xs text-gray-400 font-semibold mb-2">Jawaban Bot</div>
+                    <div className="mb-2 text-xs font-semibold text-gray-400">Jawaban Bot</div>
                     <div className="flex justify-end">
-                      <div className="bg-blue-50 text-gray-800 border border-blue-100 max-w-xl p-4 rounded-2xl rounded-tr-none text-sm leading-relaxed">
+                      <div className="max-w-xl p-4 text-sm leading-relaxed text-gray-800 border border-blue-100 rounded-tr-none bg-blue-50 rounded-2xl">
                         {chatDetail.chat.bot_reply}
                       </div>
                     </div>
@@ -282,7 +283,7 @@ export default function ChatAdmin() {
 
                   {/* Escalation Notice */}
                   <div className="flex justify-center">
-                    <div className="bg-amber-50 border border-amber-100 text-amber-800 px-4 py-3 rounded-xl text-xs flex items-center gap-2 max-w-md">
+                    <div className="flex items-center max-w-md gap-2 px-4 py-3 text-xs border bg-amber-50 border-amber-100 text-amber-800 rounded-xl">
                       <span>⚠️</span>
                       <p>
                         <b>Sistem:</b> Pertanyaan dialihkan ke Admin.{' '}
@@ -296,7 +297,7 @@ export default function ChatAdmin() {
                   {/* Admin & User Follow-up Messages */}
                   {chatDetail?.all_messages && chatDetail.all_messages.length > 0 && (
                     <div>
-                      <div className="text-xs text-gray-400 font-semibold mb-3">Percakapan Admin & User</div>
+                      <div className="mb-3 text-xs font-semibold text-gray-400">Percakapan Admin & User</div>
                       <div className="space-y-3">
                         {chatDetail.all_messages.map((msg, idx) => (
                           <div key={idx} className={`flex ${msg.type === 'admin' ? 'justify-end' : 'justify-start'}`}>
@@ -324,14 +325,14 @@ export default function ChatAdmin() {
             {/* FOOTER INPUT BOX */}
             {chatDetail?.chat.status === 'pending' && (
               <div className="p-4 bg-white border-t border-gray-100">
-                <form onSubmit={handleSendReply} className="flex gap-3 items-center">
+                <form onSubmit={handleSendReply} className="flex items-center gap-3">
                   <input
                     type="text"
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
                     placeholder="Ketik Jawaban..."
                     disabled={loading}
-                    className="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:bg-white disabled:bg-gray-100"
+                    className="w-full px-4 py-3 text-sm text-gray-800 border border-gray-200 bg-gray-50 rounded-xl focus:outline-none focus:bg-white disabled:bg-gray-100"
                   />
                   <button
                     type="submit"
@@ -346,19 +347,19 @@ export default function ChatAdmin() {
             )}
 
             {chatDetail?.chat.status === 'resolved' && (
-              <div className="p-4 bg-green-50 border-t border-green-100 text-center text-sm text-green-700 font-medium">
+              <div className="p-4 text-sm font-medium text-center text-green-700 border-t border-green-100 bg-green-50">
                 Chat ini sudah ditutup dan dijawab oleh admin
               </div>
             )}
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-gray-50">
+          <div className="flex items-center justify-center flex-1 bg-gray-50">
             <div className="text-center">
-              <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
               </svg>
-              <p className="text-gray-500 font-medium">Tidak ada chat yang dipilih</p>
-              <p className="text-gray-400 text-sm mt-1">Pilih chat dari daftar untuk memulai</p>
+              <p className="font-medium text-gray-500">Tidak ada chat yang menunggu</p>
+              <p className="mt-1 text-sm text-gray-400">Chat dari user akan otomatis muncul di sini</p>
             </div>
           </div>
         )}
