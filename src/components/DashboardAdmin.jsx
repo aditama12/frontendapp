@@ -90,21 +90,21 @@ export default function DashboardAdmin() {
   ];
 
   return (
-    <div className="space-y-8 relative">
+    <div className="relative space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
         <p className="text-sm text-gray-400">Ringkasan Aktivitas SAKTI Hari Ini</p>
       </div>
 
       {/* METRIC GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {metrics.map((m, idx) => (
-          <div key={idx} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-6">
+          <div key={idx} className="flex items-center gap-6 p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div className={`w-14 h-14 ${m.color} rounded-full flex items-center justify-center text-2xl font-bold`}>
               {m.icon}
             </div>
             <div className="space-y-1">
-              <span className="text-sm text-gray-400 font-medium">{m.name}</span>
+              <span className="text-sm font-medium text-gray-400">{m.name}</span>
               <p className="text-3xl font-bold text-gray-800">
                 {loading ? "..." : m.value}
               </p>
@@ -114,8 +114,8 @@ export default function DashboardAdmin() {
       </div>
 
       {/* TABLE DATA CONTAINER */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+      <div className="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
+        <div className="flex items-center justify-between p-6 border-b border-gray-50">
           <h3 className="font-bold text-gray-800">Pesan Masuk Terbaru</h3>
           {loading && <span className="text-sm text-gray-400 animate-pulse">Memuat data...</span>}
         </div>
@@ -123,7 +123,7 @@ export default function DashboardAdmin() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50/70 text-gray-400 text-xs font-semibold uppercase tracking-wider border-b border-gray-100">
+              <tr className="text-xs font-semibold tracking-wider text-gray-400 uppercase border-b border-gray-100 bg-gray-50/70">
                 <th className="px-6 py-4">User</th>
                 <th className="px-6 py-4">Pesan Terakhir</th>
                 <th className="px-6 py-4">Waktu</th>
@@ -131,7 +131,7 @@ export default function DashboardAdmin() {
                 <th className="px-6 py-4 text-center">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50 text-sm text-gray-600">
+            <tbody className="text-sm text-gray-600 divide-y divide-gray-50">
               {incomingChats.length === 0 && !loading ? (
                 <tr>
                   <td colSpan="5" className="px-6 py-8 text-center text-gray-400">
@@ -140,9 +140,9 @@ export default function DashboardAdmin() {
                 </tr>
               ) : (
                 incomingChats.map((chat) => (
-                  <tr key={chat.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={chat.id} className="transition-colors hover:bg-gray-50/50">
                     <td className="px-6 py-4 font-semibold text-gray-800">{chat.user}</td>
-                    <td className="px-6 py-4 max-w-xs truncate">{chat.message}</td>
+                    <td className="max-w-xs px-6 py-4 truncate">{chat.message}</td>
                     <td className="px-6 py-4 text-gray-400">
                       {new Date(chat.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                     </td>
@@ -160,7 +160,7 @@ export default function DashboardAdmin() {
                       {chat.status === 'pending' ? (
                         <button 
                             onClick={() => navigate("/mimin/chat")}
-                            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-md shadow-blue-600/10 transition-all"
+                            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white transition-all bg-blue-600 shadow-md hover:bg-blue-700 rounded-xl shadow-blue-600/10"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
@@ -170,7 +170,7 @@ export default function DashboardAdmin() {
                       ) : (
                         <button 
                           onClick={() => handleOpenDetail(chat.id)}
-                          className="border border-gray-200 hover:border-blue-500 text-gray-700 hover:text-blue-600 hover:bg-blue-50 text-xs font-semibold px-4 py-2 rounded-xl transition-all inline-flex items-center gap-2"
+                          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-gray-700 transition-all border border-gray-200 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
@@ -187,10 +187,10 @@ export default function DashboardAdmin() {
           </table>
         </div>
         
-        <div className="p-4 bg-gray-50/50 text-center border-t border-gray-50">
+        <div className="p-4 text-center border-t bg-gray-50/50 border-gray-50">
           <button 
             onClick={() => navigate("/mimin/chat")}
-            className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors inline-flex items-center gap-1"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 transition-colors hover:text-blue-700"
           >
             Lihat semua antrean &rarr;
           </button>
@@ -201,20 +201,20 @@ export default function DashboardAdmin() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div 
-            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity"
+            className="absolute inset-0 transition-opacity bg-gray-900/40 backdrop-blur-sm"
             onClick={handleCloseModal}
           ></div>
           
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col relative z-10 overflow-hidden border border-gray-100 transform transition-all scale-100">
             
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
               <div>
                 <h2 className="text-lg font-bold text-gray-800">Detail Percakapan</h2>
                 <p className="text-xs text-gray-500">Mode Read-Only (Hanya Baca)</p>
               </div>
               <button 
                 onClick={handleCloseModal}
-                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                className="p-2 text-gray-400 transition-colors hover:text-red-500 hover:bg-red-50 rounded-xl"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -222,30 +222,30 @@ export default function DashboardAdmin() {
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 space-y-6 bg-gray-50/30">
+            <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-gray-50/30">
               {loadingDetail ? (
                 <div className="flex flex-col items-center justify-center py-10 space-y-3">
-                   <svg className="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                   <svg className="w-8 h-8 text-blue-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <span className="text-sm text-gray-500 font-medium">Memuat detail percakapan...</span>
+                  <span className="text-sm font-medium text-gray-500">Memuat detail percakapan...</span>
                 </div>
               ) : selectedDetail ? (
                 <>
                   <div>
-                    <div className="text-xs text-gray-400 font-semibold mb-2 ml-1">Pertanyaan Awal User</div>
+                    <div className="mb-2 ml-1 text-xs font-semibold text-gray-400">Pertanyaan Awal User</div>
                     <div className="flex justify-start">
-                      <div className="bg-gray-200/70 text-gray-800 max-w-xl p-4 rounded-2xl rounded-tl-sm text-sm leading-relaxed border border-gray-200">
+                      <div className="max-w-xl p-4 text-sm leading-relaxed text-gray-800 border border-gray-200 rounded-tl-sm bg-gray-200/70 rounded-2xl">
                         {selectedDetail.chat.message}
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <div className="text-xs text-gray-400 font-semibold mb-2 text-right mr-1">Jawaban AI (SAKTI)</div>
+                    <div className="mb-2 mr-1 text-xs font-semibold text-right text-gray-400">Jawaban AI (SAKTI)</div>
                     <div className="flex justify-end">
-                      <div className="bg-blue-50 text-blue-900 border border-blue-100 max-w-xl p-4 rounded-2xl rounded-tr-sm text-sm leading-relaxed">
+                      <div className="max-w-xl p-4 text-sm leading-relaxed text-blue-900 border border-blue-100 rounded-tr-sm bg-blue-50 rounded-2xl">
                         {selectedDetail.chat.bot_reply}
                       </div>
                     </div>
@@ -261,7 +261,7 @@ export default function DashboardAdmin() {
 
                   {selectedDetail.all_messages && selectedDetail.all_messages.length > 0 && (
                     <div>
-                      <div className="text-xs text-gray-400 font-semibold mb-4 text-center">--- Lanjutan Percakapan ---</div>
+                      <div className="mb-4 text-xs font-semibold text-center text-gray-400">--- Lanjutan Percakapan ---</div>
                       <div className="space-y-4">
                         {selectedDetail.all_messages.map((msg, idx) => (
                           <div key={idx} className={`flex ${msg.type === 'admin' ? 'justify-end' : 'justify-start'}`}>
@@ -284,11 +284,11 @@ export default function DashboardAdmin() {
                   )}
                 </>
               ) : (
-                <div className="text-center text-gray-400 py-10">Data tidak ditemukan.</div>
+                <div className="py-10 text-center text-gray-400">Data tidak ditemukan.</div>
               )}
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+            <div className="flex justify-end px-6 py-4 border-t border-gray-100 bg-gray-50">
               <button 
                 onClick={handleCloseModal}
                 className="bg-gray-800 hover:bg-gray-900 text-white px-6 py-2.5 rounded-xl text-sm font-semibold transition-colors shadow-md"

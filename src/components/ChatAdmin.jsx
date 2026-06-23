@@ -14,7 +14,6 @@ export default function ChatAdmin() {
 
   // Gunakan Ref biar nilai terbaru bisa dibaca diam-diam tanpa bikin komponen nge-render berulang kali
   const chatListRef = useRef([]);
-  const pollingIntervalRef = useRef(null);
   const activeChatRef = useRef(null);
   const replyTextRef = useRef("");
 
@@ -37,25 +36,37 @@ export default function ChatAdmin() {
     }
   }, [chatDetail, activeChat]);
 
-  // Polling effect: Dijalankan SEKALI SAJA saat halaman dibuka
+  // Polling effect: Menggunakan Rekursif setTimeout agar request tidak menumpuk (Anti Network Error)
   useEffect(() => {
-    loadEscalatedChats();
+    let isMounted = true;
+    let timer = null;
 
-    pollingIntervalRef.current = setInterval(() => {
+    const pollData = async () => {
+      if (!isMounted) return;
+
       // Pause narik data dari server JIKA admin lagi asik ngetik, biar ketikannya gak putus
-      if (replyTextRef.current.trim()) {
-        return;
+      if (!replyTextRef.current.trim()) {
+        await loadEscalatedChats(true);
+        
+        // Refresh isi chat yang lagi dibuka
+        if (activeChatRef.current?.id) {
+          await loadChatDetail(activeChatRef.current.id, true);
+        }
       }
 
-      loadEscalatedChats(true);
-
-      // Refresh isi chat yang lagi dibuka
-      if (activeChatRef.current?.id) {
-        loadChatDetail(activeChatRef.current.id, true);
+      // Jadwalkan request berikutnya HANYA SETELAH request saat ini selesai
+      if (isMounted) {
+        timer = setTimeout(pollData, 3000);
       }
-    }, 3000);
+    };
 
-    return () => clearInterval(pollingIntervalRef.current);
+    // Jalankan pertama kali saat halaman dibuka
+    pollData();
+
+    return () => {
+      isMounted = false;
+      if (timer) clearTimeout(timer);
+    };
   }, []); 
 
   const loadEscalatedChats = async (silent = false) => {
@@ -75,7 +86,8 @@ export default function ChatAdmin() {
         }
       }
     } catch (err) {
-      console.error("Error loading escalated chats:", err);
+      // Kita redam error log jika sedang berjalan di background agar console tetap bersih
+      if (!silent) console.error("Error loading escalated chats:", err);
     }
   };
 
@@ -87,7 +99,7 @@ export default function ChatAdmin() {
         setChatDetail(response.data.data);
       }
     } catch (err) {
-      console.error("Error loading chat detail:", err);
+      if (!silent) console.error("Error loading chat detail:", err);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -100,9 +112,7 @@ export default function ChatAdmin() {
     try {
       setLoading(true);
       
-      // Pancing token Sanctum
-      await api.get("/sanctum/csrf-cookie"); 
-
+      // Langsung tembak API (Tidak perlu get csrf-cookie karena kita pakai mode Stateless API Token)
       const response = await api.post(`/api/mimin/chats/${activeChat.id}/reply`, {
         message: replyText
       });
@@ -127,9 +137,7 @@ export default function ChatAdmin() {
     try {
       setLoading(true);
       
-      // Sedia payung token sebelum nyelesaiin chat
-      await api.get("/sanctum/csrf-cookie");
-
+      // Langsung tembak API (Tidak perlu get csrf-cookie)
       const response = await api.post(`/api/mimin/chats/${activeChat.id}/resolve`);
 
       if (response.data.success) {
@@ -200,7 +208,7 @@ export default function ChatAdmin() {
                     </div>
                     <p className="text-xs text-gray-500 truncate mt-0.5">{chat.message}</p>
                   </div>
-                  {/* Titik merah sekarang cuma muncul kalau isUnread == true */}
+                  {/* Titik merah cuma muncul kalau isUnread == true */}
                   {isUnread && (
                     <div className="w-2.5 h-2.5 bg-red-500 rounded-full flex-shrink-0 animate-pulse" />
                   )}
@@ -227,7 +235,6 @@ export default function ChatAdmin() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {/* Tombol Selesaikan Chat dipindah ke Header */}
                 {activeChat.status === 'pending' && (
                   <button
                     onClick={handleResolveChat}
@@ -247,7 +254,7 @@ export default function ChatAdmin() {
 
             {/* CHAT CONTENT BOX */}
             <div className="flex-1 p-6 overflow-y-auto space-y-6">
-              {loading ? (
+              {loading && !chatDetail ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-gray-400">Memuat chat...</div>
                 </div>
@@ -286,7 +293,7 @@ export default function ChatAdmin() {
                     </div>
                   </div>
 
-                  {/* Admin & User Follow-up Messages (Combined Thread) */}
+                  {/* Admin & User Follow-up Messages */}
                   {chatDetail?.all_messages && chatDetail.all_messages.length > 0 && (
                     <div>
                       <div className="text-xs text-gray-400 font-semibold mb-3">Percakapan Admin & User</div>
@@ -314,7 +321,7 @@ export default function ChatAdmin() {
               ) : null}
             </div>
 
-            {/* FOOTER INPUT BOX (Sekarang lebih lega karena tombolnya dipindah ke atas) */}
+            {/* FOOTER INPUT BOX */}
             {chatDetail?.chat.status === 'pending' && (
               <div className="p-4 bg-white border-t border-gray-100">
                 <form onSubmit={handleSendReply} className="flex gap-3 items-center">
