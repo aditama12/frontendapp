@@ -51,31 +51,19 @@ function ChatUser({ onLogout, user }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  useEffect(() => {
-    if (!isUserScrollingRef.current) {
-      scrollToBottom();
-    }
-  }, [chats, loading, adminReplies]);
-
-  useEffect(() => {
-    if (user?.id) {
-      localStorage.setItem(`sessions_${user.id}`, JSON.stringify(sessions));
-      localStorage.setItem(`activeSessionId_${user.id}`, JSON.stringify(activeSessionId));
-      localStorage.setItem(`escalatedChatIds_${user.id}`, JSON.stringify(escalatedChatIds));
-      localStorage.setItem(`resolvedChats_${user.id}`, JSON.stringify(resolvedChats));
-    }
-  }, [sessions, activeSessionId, escalatedChatIds, resolvedChats, user?.id]);
-
-  const isCurrentChatEscalated = activeSessionId && escalatedChatIds[activeSessionId];
-  const isCurrentChatResolved = activeSessionId && resolvedChats[activeSessionId];
-
-  useEffect(() => {
+useEffect(() => {
     if (Object.keys(escalatedChatIds).length === 0) return;
     
+    let isMounted = true;
+    let timer = null;
+
     const checkAdminReplies = async () => {
+      if (!isMounted) return;
+      
       for (const [sessionId, chatId] of Object.entries(escalatedChatIds)) {
         try {
-          const response = await api.get(`/api/mimin/chats/${chatId}`);
+          // 👇 SUDAH DIGANTI: Menggunakan jalur publik, bukan rute mimin
+          const response = await api.get(`/api/chatbot/escalated/${chatId}/status`);
           if (response.data.success) {
             const { admin_replies, chat } = response.data.data;
             
@@ -94,10 +82,19 @@ function ChatUser({ onLogout, user }) {
           // Silent error
         }
       }
+
+      // 👇 SUDAH DIGANTI: Pakai setTimeout 4 detik biar gak nyekik server
+      if (isMounted) {
+        timer = setTimeout(checkAdminReplies, 4000);
+      }
     };
     
-    const interval = setInterval(checkAdminReplies, 2000);
-    return () => clearInterval(interval);
+    checkAdminReplies(); // Jalankan pertama kali
+    
+    return () => {
+      isMounted = false;
+      if (timer) clearTimeout(timer);
+    };
   }, [escalatedChatIds]);
 
   const startNewSession = () => {
@@ -280,7 +277,7 @@ function ChatUser({ onLogout, user }) {
       {/* ===== OVERLAY GELAP UNTUK MOBILE SAAT SIDEBAR BUKA ===== */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
+          className="fixed inset-0 z-40 transition-opacity duration-300 bg-gray-900/40 backdrop-blur-sm md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -294,13 +291,13 @@ function ChatUser({ onLogout, user }) {
         <div className="flex flex-col gap-6 overflow-hidden">
           <div className="flex items-center justify-between">
             <div className={`flex items-center gap-2 ${!isSidebarOpen && 'md:hidden'}`}>
-              <img src={logoSakti} alt="SAKTI" className="w-5 h-5 object-contain" />
+              <img src={logoSakti} alt="SAKTI" className="object-contain w-5 h-5" />
               <span className="text-lg font-bold text-[#002b80] tracking-wide">SAKTI</span>
             </div>
             
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition flex-shrink-0 hidden md:block"
+              className="flex-shrink-0 hidden p-1 text-gray-400 transition rounded-lg hover:text-gray-600 hover:bg-gray-100 md:block"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -308,7 +305,7 @@ function ChatUser({ onLogout, user }) {
             </button>
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition flex-shrink-0 md:hidden"
+              className="flex-shrink-0 p-1 text-gray-400 transition rounded-lg hover:text-gray-600 hover:bg-gray-100 md:hidden"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -327,7 +324,7 @@ function ChatUser({ onLogout, user }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
             {/* 👉 FIX: Tambah flex-1 min-w-0 biar teks ngalah dipotong */}
-            {isSidebarOpen && <span className="truncate flex-1 min-w-0 text-left">Obrolan Baru</span>}
+            {isSidebarOpen && <span className="flex-1 min-w-0 text-left truncate">Obrolan Baru</span>}
           </button>
           
           <div className="flex flex-col gap-1 overflow-y-auto">
@@ -341,7 +338,7 @@ function ChatUser({ onLogout, user }) {
                 <svg className="w-4 h-4 min-w-[16px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {isSidebarOpen && <span className="truncate flex-1 min-w-0 text-left text-xs">Belum ada riwayat</span>}
+                {isSidebarOpen && <span className="flex-1 min-w-0 text-xs text-left truncate">Belum ada riwayat</span>}
               </button>
             ) : (
               sessions.map((session) => (
@@ -362,7 +359,7 @@ function ChatUser({ onLogout, user }) {
                   </svg>
                   {/* 👉 FIX: Tambah flex-1 min-w-0 di sini juga */}
                   {isSidebarOpen && (
-                    <span className="truncate flex-1 min-w-0 text-xs">{session.title}</span>
+                    <span className="flex-1 min-w-0 text-xs truncate">{session.title}</span>
                   )}
                 </button>
               ))
@@ -379,15 +376,15 @@ function ChatUser({ onLogout, user }) {
           <svg className="w-4 h-4 min-w-[16px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
-          {isSidebarOpen && <span className="truncate flex-1 min-w-0 text-left">Logout</span>}
+          {isSidebarOpen && <span className="flex-1 min-w-0 text-left truncate">Logout</span>}
         </button>
       </aside>
 
       {/* ===== MAIN AREA ===== */}
-      <main className="flex-1 h-full flex flex-col relative bg-white overflow-hidden w-full">
+      <main className="relative flex flex-col flex-1 w-full h-full overflow-hidden bg-white">
         
         {/* 👉 MOBILE HEADER: HAMBURGER MENU SEKARANG DI KIRI! 👈 */}
-        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white z-30 shadow-sm">
+        <div className="z-30 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 shadow-sm md:hidden">
           <button
             onClick={() => setIsSidebarOpen(true)}
             className="text-gray-500 hover:text-gray-700 focus:outline-none p-1.5 bg-gray-50 rounded-md"
@@ -397,24 +394,24 @@ function ChatUser({ onLogout, user }) {
             </svg>
           </button>
           <div className="flex items-center gap-2">
-            <img src={logoSakti} alt="SAKTI" className="w-6 h-6 object-contain" />
+            <img src={logoSakti} alt="SAKTI" className="object-contain w-6 h-6" />
             <span className="text-lg font-bold text-[#002b80] tracking-wide">SAKTI</span>
           </div>
         </div>
 
         {isEmptyState && (
-          <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6">
-            <div className="flex flex-col items-center text-center mb-6 md:mb-8 mt-10 md:mt-0">
-              <h1 className="text-xl md:text-2xl font-medium text-gray-800 mb-1">
+          <div className="flex flex-col items-center justify-center flex-1 px-4 md:px-6">
+            <div className="flex flex-col items-center mt-10 mb-6 text-center md:mb-8 md:mt-0">
+              <h1 className="mb-1 text-xl font-medium text-gray-800 md:text-2xl">
                 Halo {user?.name?.split(" ")[0] || "User"}!
               </h1>
-              <p className="text-xl md:text-2xl font-medium text-gray-800">
+              <p className="text-xl font-medium text-gray-800 md:text-2xl">
                 Ada yang bisa <span className="text-[#004cdb] font-semibold">SAKTI</span> bantu?
               </p>
             </div>
-            <div className="w-full max-w-xl relative">
+            <div className="relative w-full max-w-xl">
               <div
-                className="absolute pointer-events-none rounded-full hidden md:block"
+                className="absolute hidden rounded-full pointer-events-none md:block"
                 style={{
                   inset: "-20px",
                   background: "radial-gradient(ellipse at center, rgba(0,76,219,0.15) 0%, transparent 70%)",
@@ -431,7 +428,7 @@ function ChatUser({ onLogout, user }) {
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder="Ketik Pesan..."
-                  className="flex-1 bg-transparent text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none py-1"
+                  className="flex-1 py-1 text-sm text-gray-700 bg-transparent placeholder:text-gray-400 focus:outline-none"
                 />
                 <button
                   type="submit"
@@ -444,7 +441,7 @@ function ChatUser({ onLogout, user }) {
                 </button>
               </form>
             </div>
-            <div className="mt-6 flex flex-wrap justify-center gap-2 max-w-lg">
+            <div className="flex flex-wrap justify-center max-w-lg gap-2 mt-6">
               {["Cara buat KTP baru?", "Syarat akta kelahiran", "Pindah domisili", "Lokasi kantor"].map((q) => (
                 <button
                   key={q}
@@ -463,7 +460,7 @@ function ChatUser({ onLogout, user }) {
             <div
               ref={chatBodyRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 space-y-4 md:space-y-6"
+              className="flex-1 px-4 py-4 space-y-4 overflow-y-auto md:px-6 md:py-6 md:space-y-6"
             >
               {chats.map((chat, i) => (
                 // 👉 FIX: Tambahkan items-end biar avatar nempel sejajar sama ekor gelembung bawahnya 👈
@@ -476,7 +473,7 @@ function ChatUser({ onLogout, user }) {
                       {chat.role === "admin" ? (
                         <span className="text-xs font-bold text-emerald-600">A</span>
                       ) : (
-                        <img src={logoSakti} alt="bot" className="w-4 h-4 md:w-4 md:h-4 object-contain" />
+                        <img src={logoSakti} alt="bot" className="object-contain w-4 h-4 md:w-4 md:h-4" />
                       )}
                     </div>
                   )}
@@ -541,12 +538,12 @@ function ChatUser({ onLogout, user }) {
 
               {/* 👉 FIX: Tambahkan items-end juga untuk bagian "Mengetik..." biar konsisten */}
               {loading && (
-                <div className="flex justify-start items-end">
-                  <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-blue-100 flex items-center justify-center mr-2 md:mr-3 flex-shrink-0">
-                    <img src={logoSakti} alt="bot" className="w-4 h-4 md:w-4 md:h-4 object-contain" />
+                <div className="flex items-end justify-start">
+                  <div className="flex items-center justify-center flex-shrink-0 mr-2 bg-blue-100 rounded-full w-7 h-7 md:w-8 md:h-8 md:mr-3">
+                    <img src={logoSakti} alt="bot" className="object-contain w-4 h-4 md:w-4 md:h-4" />
                   </div>
-                  <div className="bg-gray-100 px-4 py-3 rounded-2xl rounded-bl-sm">
-                    <div className="flex gap-1 items-center h-3 md:h-4">
+                  <div className="px-4 py-3 bg-gray-100 rounded-bl-sm rounded-2xl">
+                    <div className="flex items-center h-3 gap-1 md:h-4">
                       {[0, 0.2, 0.4].map((delay, j) => (
                         <span key={j} className="w-1.5 h-1.5 md:w-2 md:h-2 bg-[#004cdb] rounded-full animate-bounce opacity-60" style={{ animationDelay: `${delay}s` }} />
                       ))}
@@ -556,10 +553,10 @@ function ChatUser({ onLogout, user }) {
               )}
             </div>
 
-            <div className="px-4 md:px-6 py-3 md:py-4 border-t border-gray-100 bg-white">
+            <div className="px-4 py-3 bg-white border-t border-gray-100 md:px-6 md:py-4">
               {isCurrentChatResolved ? (
-                <div className="p-3 md:p-4 bg-green-50 border border-green-100 rounded-2xl text-center text-xs md:text-sm text-green-800 shadow-sm">
-                  <p className="font-bold text-sm md:text-base mb-1">Obrolan telah selesai</p>
+                <div className="p-3 text-xs text-center text-green-800 border border-green-100 shadow-sm md:p-4 bg-green-50 rounded-2xl md:text-sm">
+                  <p className="mb-1 text-sm font-bold md:text-base">Obrolan telah selesai</p>
                   <p className="text-green-700">Admin telah menutup sesi ini. Jika ada pertanyaan lain, silahkan <button onClick={startNewSession} className="text-[#004cdb] font-bold hover:underline">buat obrolan baru</button>.</p>
                 </div>
               ) : (
@@ -570,7 +567,7 @@ function ChatUser({ onLogout, user }) {
                       <p className="text-blue-700 mt-0.5 md:mt-1">Anda masih bisa menambah informasi atau klarifikasi untuk membantu Admin memahami pertanyaan Anda lebih baik.</p>
                     </div>
                   )}
-                  <div className="w-full max-w-3xl mx-auto relative">
+                  <div className="relative w-full max-w-3xl mx-auto">
                     <form
                       onSubmit={handleSendMessage}
                       className="relative bg-white border border-gray-200 rounded-3xl md:rounded-full px-3 md:px-5 py-2 md:py-3 flex items-center gap-2 md:gap-3 shadow-sm md:shadow-[0_4px_30px_rgba(0,76,219,0.12)]"

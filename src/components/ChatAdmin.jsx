@@ -32,16 +32,40 @@ export default function ChatAdmin() {
     setLastViewed(prev => ({ ...prev, [chat.id]: Date.now() }));
   };
 
-  // Update waktu baca saat chat detail di-refresh otomatis
-  useEffect(() => {
-    if (activeChat?.id && chatDetail) {
-      setLastViewed(prev => ({ ...prev, [activeChat.id]: Date.now() }));
-    }
-  }, [chatDetail, activeChat]);
-
-  useEffect(() => {
+useEffect(() => {
     let isMounted = true;
     let timer = null;
+
+    const pollData = async (isFirstTime = false) => {
+      if (!isMounted) return;
+
+      try {
+        if (!replyTextRef.current.trim()) {
+          await loadEscalatedChats(isFirstTime); 
+
+          // Refresh isi chat yang lagi dibuka (Silent background mode)
+          if (activeChatRef.current?.id) {
+            await loadChatDetail(activeChatRef.current.id, true);
+          }
+        }
+      } catch (err) {
+        console.error("Polling tertunda:", err);
+      } finally {
+        if (isMounted) {
+          if (isFirstTime) setInitialLoad(false); // Matikan skeleton loading kiri
+          // 👇 SUDAH DIGANTI: Jeda ditambah jadi 4 detik biar aplikasi stabil
+          timer = setTimeout(() => pollData(false), 4000);
+        }
+      }
+    };
+
+    pollData(true);
+
+    return () => {
+      isMounted = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
     const pollData = async (isFirstTime = false) => {
       if (!isMounted) return;
