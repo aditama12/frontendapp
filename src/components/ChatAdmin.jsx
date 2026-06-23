@@ -32,7 +32,7 @@ export default function ChatAdmin() {
     setLastViewed(prev => ({ ...prev, [chat.id]: Date.now() }));
   };
 
-useEffect(() => {
+  useEffect(() => {
     let isMounted = true;
     let timer = null;
 
@@ -53,7 +53,6 @@ useEffect(() => {
       } finally {
         if (isMounted) {
           if (isFirstTime) setInitialLoad(false); // Matikan skeleton loading kiri
-          // 👇 SUDAH DIGANTI: Jeda ditambah jadi 4 detik biar aplikasi stabil
           timer = setTimeout(() => pollData(false), 4000);
         }
       }
@@ -66,32 +65,6 @@ useEffect(() => {
       if (timer) clearTimeout(timer);
     };
   }, []);
-
-    const pollData = async (isFirstTime = false) => {
-      if (!isMounted) return;
-
-      if (!replyTextRef.current.trim()) {
-        await loadEscalatedChats(isFirstTime); 
-
-        // Refresh isi chat yang lagi dibuka (Silent background mode)
-        if (activeChatRef.current?.id) {
-          await loadChatDetail(activeChatRef.current.id, true);
-        }
-      }
-
-      if (isMounted) {
-        if (isFirstTime) setInitialLoad(false); // Matikan skeleton loading kiri
-        timer = setTimeout(() => pollData(false), 3000);
-      }
-    };
-
-    pollData(true);
-
-    return () => {
-      isMounted = false;
-      if (timer) clearTimeout(timer);
-    };
-  }, []); 
 
   const loadEscalatedChats = async (isFirstTime = false) => {
     try {
