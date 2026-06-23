@@ -110,13 +110,9 @@ function ChatUser({ onLogout, user }) {
 
   // ─── POLLING: hanya untuk sesi aktif, tiap 5 detik ───────────────────────
   useEffect(() => {
-    // Reset admin messages saat ganti sesi
-    setAdminMessages([]);
-
     if (!activeSessionId) return;
     const chatId = escalatedChatIds[activeSessionId];
     if (!chatId) return;
-    if (resolvedChats[activeSessionId]) return;
 
     let active = true;
     let timer  = null;
@@ -124,10 +120,14 @@ function ChatUser({ onLogout, user }) {
     const poll = async () => {
       if (!active) return;
       await fetchAdminReplies(activeSessionId, chatId);
-      if (active) timer = setTimeout(poll, 5000);
+      
+      // Lanjut polling HANYA jika belum resolved
+      if (active && !resolvedChats[activeSessionId]) {
+        timer = setTimeout(poll, 5000);
+      }
     };
 
-    // Langsung fetch pertama kali (tidak tunggu 5 detik)
+    // Langsung fetch pertama kali (tetap fetch histori meskipun sudah resolved)
     poll();
 
     return () => { active = false; if (timer) clearTimeout(timer); };
@@ -140,12 +140,12 @@ function ChatUser({ onLogout, user }) {
       if (document.visibilityState !== "visible") return;
       if (!activeSessionId) return;
       const chatId = escalatedChatIds[activeSessionId];
-      if (!chatId || resolvedChats[activeSessionId]) return;
+      if (!chatId) return;
       fetchAdminReplies(activeSessionId, chatId);
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [activeSessionId, escalatedChatIds, resolvedChats, fetchAdminReplies]);
+  }, [activeSessionId, escalatedChatIds, fetchAdminReplies]);
 
   // ─── Session management ───────────────────────────────────────────────────
   const startNewSession = () => {
