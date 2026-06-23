@@ -32,6 +32,10 @@ api.interceptors.response.use(
       if (error.config?.url?.includes("/login")) {
         return Promise.reject("Email atau kata sandi yang Anda masukkan salah.");
       }
+      // Jangan logout jika request adalah polling status (route publik yang mungkin gagal sementara)
+      if (error.config?.url?.includes("/status")) {
+        return Promise.reject(error);
+      }
       localStorage.removeItem("auth_token");
       localStorage.removeItem("user");
       return Promise.reject("Sesi Anda telah habis atau belum login.");
