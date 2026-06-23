@@ -18,39 +18,34 @@ function ChatUser({ onLogout, user }) {
   };
 
   // ─── State utama ──────────────────────────────────────────────────────────
-  const [sessions, setSessions]             = useState(() => getSavedData("sessions", []));
-  const [activeSessionId, setActiveSessionId] = useState(() => getSavedData("activeSessionId", null));
+  const [sessions, setSessions]               = useState(() => getSavedData("sessions", []));
+  const [activeSessionId, setActiveSessionId]   = useState(() => getSavedData("activeSessionId", null));
   const [escalatedChatIds, setEscalatedChatIds] = useState(() => getSavedData("escalatedChatIds", {}));
-  const [resolvedChats, setResolvedChats]   = useState(() => getSavedData("resolvedChats", {}));
+  const [resolvedChats, setResolvedChats]       = useState(() => getSavedData("resolvedChats", {}));
   const [chats, setChats] = useState(() => {
-    const savedSessions = getSavedData("sessions", []);
-    const savedActiveId = getSavedData("activeSessionId", null);
-    const currentSession = savedSessions.find(s => String(s.id) === String(savedActiveId));
-    return currentSession ? currentSession.chats : [];
+    const saved    = getSavedData("sessions", []);
+    const activeId = getSavedData("activeSessionId", null);
+    const session  = saved.find(s => String(s.id) === String(activeId));
+    return session ? session.chats : [];
   });
+
+  // State TERPISAH untuk balasan admin (di-fetch dari API, tidak di-mix ke chats)
+  // Ini jauh lebih simpel dan reliable dibanding append ke chats
+  const [adminMessages, setAdminMessages] = useState([]);
 
   // ─── Derived flags ────────────────────────────────────────────────────────
   const isCurrentChatEscalated = activeSessionId ? !!escalatedChatIds[activeSessionId] : false;
   const isCurrentChatResolved  = activeSessionId ? !!resolvedChats[activeSessionId]    : false;
+  // Gabungan pesan untuk ditampilkan (chats user/bot + balasan admin)
+  const allMessages = [...chats, ...adminMessages];
 
   // ─── Refs ─────────────────────────────────────────────────────────────────
   const chatBodyRef        = useRef(null);
   const inputRef           = useRef(null);
   const messagesEndRef     = useRef(null);
   const isUserScrollingRef = useRef(false);
-  // Refs agar closure async bisa baca nilai state terbaru
-  const activeSessionIdRef  = useRef(activeSessionId);
-  const escalatedChatIdsRef = useRef(escalatedChatIds);
-  const resolvedChatsRef    = useRef(resolvedChats);
-  // Jumlah admin reply yang sudah ditampilkan, per "sessionId_chatId"
-  const shownCountRef = useRef({});
 
-  // Sync refs setiap kali state berubah
-  useEffect(() => { activeSessionIdRef.current  = activeSessionId;  }, [activeSessionId]);
-  useEffect(() => { escalatedChatIdsRef.current = escalatedChatIds; }, [escalatedChatIds]);
-  useEffect(() => { resolvedChatsRef.current    = resolvedChats;    }, [resolvedChats]);
-
-  // ─── Helpers UI ───────────────────────────────────────────────────────────
+  // ─── Helpers ──────────────────────────────────────────────────────────────
   const handleMobileSidebarClose = () => {
     if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
@@ -63,7 +58,7 @@ function ChatUser({ onLogout, user }) {
   };
 
   const scrollToBottom = useCallback(() => {
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 60);
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
   }, []);
 
   // ─── Persist ke localStorage ──────────────────────────────────────────────
@@ -78,93 +73,79 @@ function ChatUser({ onLogout, user }) {
     save("resolvedChats",    resolvedChats);
   }, [sessions, activeSessionId, escalatedChatIds, resolvedChats, user?.id]);
 
-  // ─── Fetch & apply admin replies ──────────────────────────────────────────
-  // Bisa dipanggil kapan saja (polling, visibilitychange, selectSession).
-  // Hanya append reply yang BELUM ditampilkan — aman jika dipanggil berulang.
-  const fetchAndApplyReplies = useCallback(async (sessionIdParam, chatIdParam) => {
+  // ─── Fetch balasan admin untuk sesi AKTIF ─────────────────────────────────
+  // Fungsi ini di-call oleh polling dan visibilitychange.
+  // Hasilnya langsung di-set ke adminMessages (replace, bukan append)
+  // sehingga tidak perlu tracking kompleks.
+  const fetchAdminReplies = useCallback(async (sessionId, chatId) => {
     try {
-      const response = await api.get(`/api/chatbot/escalated/${chatIdParam}/status`);
-      if (!response.data?.success) return;
+      const res = await api.get(`/api/chatbot/escalated/${chatId}/status`);
+      if (!res.data?.success) return;
 
-      const { admin_replies, chat } = response.data.data;
+      const { admin_replies, chat } = res.data.data;
 
-      // Tandai resolved
       if (chat?.status === "resolved") {
         setResolvedChats(prev => {
-          if (prev[sessionIdParam]) return prev;
-          return { ...prev, [sessionIdParam]: true };
+          if (prev[sessionId]) return prev;
+          return { ...prev, [sessionId]: true };
         });
       }
 
-      // Hitung berapa yang belum ditampilkan
-      const key          = `${sessionIdParam}_${chatIdParam}`;
-      const alreadyShown = shownCountRef.current[key] || 0;
-      if (!admin_replies || admin_replies.length <= alreadyShown) return;
+      if (!admin_replies || admin_replies.length === 0) return;
 
-      const newReplies = admin_replies.slice(alreadyShown);
-      shownCountRef.current[key] = admin_replies.length;
-
-      const newMessages = newReplies.map(r => ({
+      const messages = admin_replies.map(r => ({
         role: "admin",
         text: r.message,
         time: new Date(r.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
         isAdminReply: true,
       }));
 
-      // Selalu update sessions (riwayat sidebar)
-      setSessions(prev =>
-        prev.map(s =>
-          String(s.id) === String(sessionIdParam)
-            ? { ...s, chats: [...s.chats, ...newMessages] }
-            : s
-        )
-      );
-
-      // Update tampilan hanya jika sesi ini yang sedang aktif
-      if (String(sessionIdParam) === String(activeSessionIdRef.current)) {
-        setChats(prev => [...prev, ...newMessages]);
-        scrollToBottom();
-      }
-    } catch (_) {
-      // Silent — satu request gagal tidak boleh crash polling
+      // REPLACE seluruh adminMessages — tidak ada tracking/counting, pasti benar
+      setAdminMessages(messages);
+      scrollToBottom();
+    } catch (err) {
+      // Silent
     }
   }, [scrollToBottom]);
 
-  // ─── Polling: cek balasan admin setiap 5 detik ────────────────────────────
+  // ─── POLLING: hanya untuk sesi aktif, tiap 5 detik ───────────────────────
   useEffect(() => {
-    const entries = Object.entries(escalatedChatIds);
-    if (entries.length === 0) return;
+    // Reset admin messages saat ganti sesi
+    setAdminMessages([]);
+
+    if (!activeSessionId) return;
+    const chatId = escalatedChatIds[activeSessionId];
+    if (!chatId) return;
+    if (resolvedChats[activeSessionId]) return;
 
     let active = true;
     let timer  = null;
 
     const poll = async () => {
       if (!active) return;
-      for (const [sid, cid] of entries) {
-        if (resolvedChatsRef.current[sid]) continue; // skip sesi sudah selesai
-        await fetchAndApplyReplies(sid, cid);
-      }
+      await fetchAdminReplies(activeSessionId, chatId);
       if (active) timer = setTimeout(poll, 5000);
     };
 
+    // Langsung fetch pertama kali (tidak tunggu 5 detik)
     poll();
-    return () => { active = false; if (timer) clearTimeout(timer); };
-  // Re-start hanya jika escalatedChatIds berubah (sesi baru di-escalate)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [escalatedChatIds]);
 
-  // ─── visibilitychange: fetch ulang saat tab kembali aktif (mobile) ────────
+    return () => { active = false; if (timer) clearTimeout(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId, escalatedChatIds, resolvedChats]);
+
+  // ─── Re-fetch saat tab kembali aktif (penting di mobile) ─────────────────
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
-      for (const [sid, cid] of Object.entries(escalatedChatIdsRef.current)) {
-        if (resolvedChatsRef.current[sid]) continue;
-        fetchAndApplyReplies(sid, cid);
-      }
+      if (!activeSessionId) return;
+      const chatId = escalatedChatIds[activeSessionId];
+      if (!chatId || resolvedChats[activeSessionId]) return;
+      fetchAdminReplies(activeSessionId, chatId);
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [fetchAndApplyReplies]);
+  }, [activeSessionId, escalatedChatIds, resolvedChats, fetchAdminReplies]);
 
   // ─── Session management ───────────────────────────────────────────────────
   const startNewSession = () => {
@@ -172,6 +153,7 @@ function ChatUser({ onLogout, user }) {
     setSessions(prev => [newSession, ...prev]);
     setActiveSessionId(newSession.id);
     setChats([]);
+    setAdminMessages([]);
     inputRef.current?.focus();
     isUserScrollingRef.current = false;
     handleMobileSidebarClose();
@@ -180,13 +162,9 @@ function ChatUser({ onLogout, user }) {
   const selectSession = (session) => {
     setActiveSessionId(session.id);
     setChats(session.chats || []);
+    setAdminMessages([]); // Reset, polling akan fetch ulang untuk sesi baru
     isUserScrollingRef.current = false;
     handleMobileSidebarClose();
-    // Langsung fetch reply terbaru dari API saat buka sesi escalated yang belum resolved
-    const chatId = escalatedChatIds[session.id];
-    if (chatId && !resolvedChats[session.id]) {
-      fetchAndApplyReplies(session.id, chatId);
-    }
   };
 
   const updateTitle = (sessionId, text) => {
@@ -198,7 +176,6 @@ function ChatUser({ onLogout, user }) {
   const handleSendMessage = async (e) => {
     e?.preventDefault();
     if (!inputMessage.trim() || loading || isCurrentChatResolved) return;
-
     isUserScrollingRef.current = false;
 
     let sessionId = activeSessionId;
@@ -213,10 +190,10 @@ function ChatUser({ onLogout, user }) {
     const msgId   = Date.now();
     const userMsg = { id: msgId, role: "user", text: inputMessage, time: now, status: "sending" };
 
-    // Gunakan functional updater supaya tidak kehilangan admin replies yang sudah ada
     setChats(prev => {
       const updated = [...prev, userMsg];
       if (prev.length === 0) setTimeout(() => updateTitle(sessionId, inputMessage), 0);
+      setSessions(p => p.map(s => s.id === sessionId ? { ...s, chats: updated } : s));
       return updated;
     });
 
@@ -226,18 +203,15 @@ function ChatUser({ onLogout, user }) {
 
     try {
       if (isCurrentChatEscalated) {
-        const chatId   = escalatedChatIds[sessionId];
+        const chatId = escalatedChatIds[sessionId];
         const response = await api.post(`/api/chatbot/escalated/${chatId}/follow-up`, { message: msgToSend });
 
         if (response.data.success) {
-          // Functional updater — jangan overwrite admin replies yang sudah ada
-          setChats(prev => prev.map(c => c.id === msgId ? { ...c, status: "sent" } : c));
-          setSessions(prev =>
-            prev.map(s => s.id === sessionId
-              ? { ...s, chats: s.chats.map(c => c.id === msgId ? { ...c, status: "sent" } : c) }
-              : s
-            )
-          );
+          setChats(prev => {
+            const updated = prev.map(c => c.id === msgId ? { ...c, status: "sent" } : c);
+            setSessions(p => p.map(s => s.id === sessionId ? { ...s, chats: updated } : s));
+            return updated;
+          });
         }
       } else {
         const response = await api.post("/api/chatbot/send", { message: msgToSend, user_id: user?.id });
@@ -291,7 +265,6 @@ function ChatUser({ onLogout, user }) {
   return (
     <div className="h-[100dvh] w-screen flex bg-gray-50 font-sans text-gray-900 overflow-hidden relative">
       
-      {/* ===== OVERLAY GELAP UNTUK MOBILE SAAT SIDEBAR BUKA ===== */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 z-40 transition-opacity duration-300 bg-gray-900/40 backdrop-blur-sm md:hidden"
@@ -299,7 +272,6 @@ function ChatUser({ onLogout, user }) {
         />
       )}
 
-      {/* ===== SIDEBAR (RESPONSIVE DRAWER) ===== */}
       <aside className={`fixed md:relative z-50 h-full bg-white flex flex-col justify-between py-6 transition-transform duration-300 ease-in-out flex-shrink-0 border-r border-gray-100 ${
         isSidebarOpen 
           ? "translate-x-0 w-64 md:w-56 px-5 shadow-2xl md:shadow-none" 
@@ -311,7 +283,6 @@ function ChatUser({ onLogout, user }) {
               <img src={logoSakti} alt="SAKTI" className="object-contain w-5 h-5" />
               <span className="text-lg font-bold text-[#002b80] tracking-wide">SAKTI</span>
             </div>
-            
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="flex-shrink-0 hidden p-1 text-gray-400 transition rounded-lg hover:text-gray-600 hover:bg-gray-100 md:block"
@@ -393,7 +364,6 @@ function ChatUser({ onLogout, user }) {
         </button>
       </aside>
 
-      {/* ===== MAIN AREA ===== */}
       <main className="relative flex flex-col flex-1 w-full h-full overflow-hidden bg-white">
         
         {/* MOBILE HEADER */}
@@ -475,8 +445,12 @@ function ChatUser({ onLogout, user }) {
               onScroll={handleScroll}
               className="flex-1 px-4 py-4 space-y-4 overflow-y-auto md:px-6 md:py-6 md:space-y-6"
             >
-              {chats.map((chat, i) => (
-                <div key={i} className={`flex w-full items-end ${chat.role === "system" ? "justify-center" : chat.role === "user" ? "justify-end" : "justify-start"}`}>
+              {/* Render gabungan chats (user/bot) + adminMessages */}
+              {allMessages.map((chat, i) => (
+                <div key={i} className={`flex w-full items-end ${
+                  chat.role === "system" ? "justify-center" :
+                  chat.role === "user"   ? "justify-end"   : "justify-start"
+                }`}>
                   {(chat.role === "bot" || chat.role === "admin") && (
                     <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center mr-2 md:mr-3 flex-shrink-0 ${
                       chat.role === "admin" ? "bg-emerald-100" : "bg-blue-100"
@@ -504,33 +478,31 @@ function ChatUser({ onLogout, user }) {
                     }`}>
                       <p className="whitespace-pre-line">{chat.text}</p>
                     </div>
-                    
-                    <p className={`text-[10px] md:text-[11px] text-gray-400 mt-1 md:mt-1.5 flex items-center gap-1 ${chat.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <p className={`text-[10px] md:text-[11px] text-gray-400 mt-1 md:mt-1.5 flex items-center gap-1 ${
+                      chat.role === "user" ? "justify-end" : "justify-start"
+                    }`}>
                       <span>{chat.time}</span>
-                      
                       {chat.role === "user" && (
                         <span className="flex items-center">
                           {chat.status === "sending" && (
-                            <svg className="w-3 h-3 md:w-3.5 md:h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                           )}
                           {chat.status === "failed" && (
-                            <svg className="w-3 h-3 md:w-3.5 md:h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <svg className="w-3 h-3 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                           )}
                           {(!chat.status || chat.status === "sent") && (
                             <>
                               {isCurrentChatEscalated ? (
-                                <svg 
-                                  className={`w-3.5 h-3.5 md:w-4 md:h-4 ${chats.slice(i + 1).some(c => c.role === "admin") ? "text-blue-500" : "text-gray-400"}`} 
-                                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"
-                                >
+                                <svg className={`w-3.5 h-3.5 ${adminMessages.length > 0 ? "text-blue-500" : "text-gray-400"}`}
+                                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.5l4 4 8-8m-4 8l4 4 8-8" />
                                 </svg>
                               ) : (
-                                <svg className="w-3 h-3 md:w-3.5 md:h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                 </svg>
                               )}
@@ -542,6 +514,18 @@ function ChatUser({ onLogout, user }) {
                   </div>
                 </div>
               ))}
+
+              {/* Indikator loading balasan admin */}
+              {isCurrentChatEscalated && !isCurrentChatResolved && adminMessages.length === 0 && (
+                <div className="flex items-center justify-start gap-2 text-[11px] text-gray-400 pl-1">
+                  <span className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: "0s" }} />
+                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }} />
+                  </span>
+                  <span>Menunggu balasan Admin...</span>
+                </div>
+              )}
 
               <div ref={messagesEndRef} />
 
