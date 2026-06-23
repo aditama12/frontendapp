@@ -260,6 +260,14 @@ function ChatUser({ onLogout, user }) {
     }
   };
 
+  // Gabungan pesan untuk ditampilkan (chats user/bot + balasan admin)
+  // Sort berdasarkan waktu agar chat saling berurutan (interleaved) atas bawah
+  const allMessages = [...chats, ...adminMessages].sort((a, b) => {
+    const timeA = (a.time || "").replace(".", ":");
+    const timeB = (b.time || "").replace(".", ":");
+    return timeA.localeCompare(timeB);
+  });
+
   const isEmptyState = !activeSessionId || chats.length === 0;
 
   return (
