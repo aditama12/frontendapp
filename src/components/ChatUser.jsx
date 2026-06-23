@@ -42,6 +42,7 @@ function ChatUser({ onLogout, user }) {
   const inputRef           = useRef(null);
   const messagesEndRef     = useRef(null);
   const isUserScrollingRef = useRef(false);
+  const lastTimestampRef   = useRef(Date.now()); // Tracking timestamp tertinggi agar tidak kena clock drift HP vs Server
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   const handleMobileSidebarClose = () => {
@@ -91,13 +92,23 @@ function ChatUser({ onLogout, user }) {
 
       if (!admin_replies || admin_replies.length === 0) return;
 
-      const messages = admin_replies.map((r, index) => ({
-        id: new Date(r.created_at).getTime() + index, // Gunakan unix timestamp dari server sebagai ID
-        role: "admin",
-        text: r.message,
-        time: new Date(r.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-        isAdminReply: true,
-      }));
+      let maxAdminTime = 0;
+      const messages = admin_replies.map((r, index) => {
+        const ts = new Date(r.created_at).getTime() + index; // Gunakan unix timestamp dari server sebagai ID
+        if (ts > maxAdminTime) maxAdminTime = ts;
+        return {
+          id: ts,
+          role: "admin",
+          text: r.message,
+          time: new Date(r.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+          isAdminReply: true,
+        };
+      });
+
+      // Update jam tertinggi jika server lebih cepat dari HP
+      if (maxAdminTime > lastTimestampRef.current) {
+        lastTimestampRef.current = maxAdminTime;
+      }
 
       // REPLACE seluruh adminMessages — tidak ada tracking/counting, pasti benar
       setAdminMessages(messages);
@@ -186,7 +197,14 @@ function ChatUser({ onLogout, user }) {
     }
 
     const now     = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-    const msgId   = Date.now();
+    
+    // Pastikan ID pesan user (timestamp) selalu lebih besar dari pesan terakhir (mengatasi clock drift)
+    let msgId = Date.now();
+    if (msgId <= lastTimestampRef.current) {
+      msgId = lastTimestampRef.current + 1000; // Majukan 1 detik
+    }
+    lastTimestampRef.current = msgId;
+
     const userMsg = { id: msgId, role: "user", text: inputMessage, time: now, status: "sending" };
 
     setChats(prev => {
@@ -215,14 +233,29 @@ function ChatUser({ onLogout, user }) {
       } else {
         const response = await api.post("/api/chatbot/send", { message: msgToSend, user_id: user?.id });
         const botTime  = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-        const botMsg   = {
+        // Pastikan botMsg juga mengikuti aturan monotonic timestamp
+        let botMsgId = Date.now() + 1;
+        if (botMsgId <= lastTimestampRef.current) {
+          botMsgId = lastTimestampRef.current + 1000;
+        }
+        lastTimestampRef.current = botMsgId;
+
+        const botMsg = {
+          id: botMsgId,
           role: "bot",
           text: response.data.answer || response.data.message || "Maaf, tidak ada jawaban dari chatbot.",
           time: botTime,
         };
 
         if (response.data.needs_escalation && response.data.chat_id) {
+          let escMsgId = Date.now() + 2;
+          if (escMsgId <= lastTimestampRef.current) {
+            escMsgId = lastTimestampRef.current + 1000;
+          }
+          lastTimestampRef.current = escMsgId;
+
           const escalationMsg = {
+            id: escMsgId,
             role: "system",
             text: "⚠️ Sistem: Pertanyaan Anda telah dialihkan ke Admin. Harap menunggu tanggapan.",
             time: botTime,
