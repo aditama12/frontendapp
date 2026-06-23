@@ -1,13 +1,12 @@
 import axios from "axios";
 
-// 🚀 TAMBAHKAN FALLBACK RAILWAY DISINI
-const API_URL = import.meta.env.VITE_API_URL || "https://chatbotapp-production-d5b3.up.railway.app";
-
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: "https://chatbotapp-production-d5b3.up.railway.app",
   timeout: 15000,
-  // 🚀 WAJIB TAMBAHKAN INI: Matikan mode cookie secara paksa agar tidak bentrok dengan CORS bintang (*)
-  withCredentials: false, 
+  
+  // 🚀 WAJIB DITAMBAHKAN AGAR SINKRON DENGAN LARAVEL
+  withCredentials: true, 
+  
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
