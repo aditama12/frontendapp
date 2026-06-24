@@ -497,7 +497,33 @@ function ChatUser({ onLogout, user }) {
                               ? "bg-red-50 border border-red-100 text-red-600 rounded-bl-sm"
                               : "bg-gray-100 text-gray-800 rounded-bl-sm"
                     }`}>
-                      <p className="whitespace-pre-line">{chat.text}</p>
+                      {/* Render teks: bot pakai ReactMarkdown, lainnya plain text */}
+                      {(chat.role === "bot") ? (
+                        <ReactMarkdown
+                          components={{
+                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                            strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                            em: ({ children }) => <em className="italic">{children}</em>,
+                            h1: ({ children }) => <h1 className="text-base font-bold mb-2 mt-1">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-sm font-bold mb-1.5 mt-1">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 mt-1">{children}</h3>,
+                            ul: ({ children }) => <ul className="list-disc list-outside ml-4 mb-2 space-y-0.5">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal list-outside ml-4 mb-2 space-y-0.5">{children}</ol>,
+                            li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                            code: ({ inline, children }) =>
+                              inline
+                                ? <code className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+                                : <pre className="bg-gray-200 text-gray-800 p-2 rounded-lg text-xs font-mono overflow-x-auto mt-1 mb-2 whitespace-pre-wrap">{children}</pre>,
+                            blockquote: ({ children }) => <blockquote className="border-l-2 border-blue-300 pl-3 italic text-gray-600 mb-2">{children}</blockquote>,
+                            hr: () => <hr className="border-gray-300 my-2" />,
+                            a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">{children}</a>,
+                          }}
+                        >
+                          {chat.text}
+                        </ReactMarkdown>
+                      ) : (
+                        <p className="whitespace-pre-line">{chat.text}</p>
+                      )}
                     </div>
                     <p className={`text-[10px] md:text-[11px] text-gray-400 mt-1 md:mt-1.5 flex items-center gap-1 ${
                       chat.role === "user" ? "justify-end" : "justify-start"
